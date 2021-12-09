@@ -18,7 +18,10 @@ __version__ = "0.0.1"
 #   reproducible builds (https://github.com/pybind/python_example/pull/53)
 
 sources = sorted(glob("src/*.cpp"))
-sources.extend(sorted(glob("python-rdma-transport/*.c")))
+#sources.extend(['rdma-data-transport/RDMAapi.c','rdma-data-transport/RDMAmemorymanager.c', 'rdma-data-transport/RDMAexchangeidcallbacks.c'])
+sources.extend(glob('rdma-data-transport/*.c'))
+
+#print(sources)
 
 ext_modules = [
     Pybind11Extension("rdma_transport",
@@ -27,7 +30,7 @@ ext_modules = [
                       define_macros = [('VERSION_INFO', __version__)],
                       include_dirs=['rdma-data-transport'],
                       extra_compile_args= ['-ggdb','-O0', '-UNDEBUG'],
-                      extra_link_args= ['-ggdb', '-UNDEBUG'],
+                      extra_link_args= ['-ggdb', '-UNDEBUG', '-lm','-lrdmacm', '-libverbs','-lcurl']
     ),
 ]
 
