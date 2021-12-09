@@ -1,0 +1,3 @@
+[submodule "rdma-data-transport"]
+	path = rdma-data-transport
+	url = https://gitlab.com/ska-telescope/rdma-data-transport.git
