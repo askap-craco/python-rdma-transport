@@ -20,7 +20,11 @@ struct RdmaTransport {
   struct ibv_cq *receiveCompletionQueuePtr;
   struct ibv_cq *sendCompletionQueuePtr;
   struct ibv_qp *queuePairPtr;
-  
+
+  uint16_t localIdentifier;
+  union ibv_gid gidAddress;
+  enum ibv_mtu mtu;
+
   RdmaTransport(const std::string &_rdmaDeviceName,
                 uint8_t _rdmaPort,
                 uint32_t _queueCapacity,
@@ -45,7 +49,13 @@ struct RdmaTransport {
                           &receiveCompletionQueuePtr,
                           &sendCompletionQueuePtr,
                           &queuePairPtr);
-    
+   
+    setupRDMAConnection(rdmaDeviceContextPtr,
+			rdmaPort,
+			&localIdentifier,
+			&gidAddress,
+			&gidIndex,
+			&mtu); 
   }
   
   virtual ~RdmaTransport()
@@ -58,21 +68,6 @@ struct RdmaTransport {
                          queuePairPtr);
   }
   
-  uint16_t localIdentifier;
-  union ibv_gid gidAddress;
-  enum ibv_mtu mtu;
-  
-  int setupRDMAConnectionPybind11()
-  {
-    return setupRDMAConnection(rdmaDeviceContextPtr,
-			       rdmaPort,
-			       &localIdentifier,
-			       &gidAddress,
-			       &gidIndex,
-			       &mtu);
-  }
-  
- 
   uint32_t remotePSN;
   uint32_t remoteQPN;
   union ibv_gid remoteGID;
@@ -112,6 +107,7 @@ struct RdmaTransport {
   //int registerMemoryRegions(struct ibv_pd *protectionDomain,
   //			    MemoryRegionManager* manager);
   //
+  
   int ibv_req_notify_cq_pybind11(struct ibv_cq *cq,
 				 int solicited_only){
 
@@ -153,12 +149,6 @@ PYBIND11_MODULE(rdma_transport, m) {
 	   uint32_t,
 	   int,
 	   enum runMode>())
-      
-      /**********************************************************************
-       * Sets up the RDMA connection and return its details in the
-       * pointer parameters
-       **********************************************************************/
-      .def("setupRDMAConnectionPybind11", &RdmaTransport::setupRDMAConnectionPybind11)
       
       /**********************************************************************
        * Exchanges the necessary RDMA configuration identifiers with those of
