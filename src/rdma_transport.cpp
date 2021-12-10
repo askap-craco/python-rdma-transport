@@ -53,6 +53,77 @@ struct RdmaTransport {
     metricURL(_metricURL),
     numMetricAveraging(_numMetricAveraging)   
   {
+    if (numTotalMessages == 0)
+      numTotalMessages = numMemoryBlocks * numContiguousMessages;
+    if (numMetricAveraging == 0)
+      numMetricAveraging = numMemoryBlocks * numContiguousMessages;
+    setLogLevel(requestLogLevel);
+
+    if (mode == SEND_MODE)
+      {
+        logger(LOG_INFO, "Receive Visibilities starting as sender");
+      }
+    else
+      {
+        logger(LOG_INFO, "Receive Visibilities starting as receiver");
+      }
+
+    /* allocate memory blocks as buffers to be used in the memory regions */
+    uint64_t memoryBlockSize = messageSize * numContiguousMessages;
+    void **memoryBlocks = allocateMemoryBlocks(memoryBlockSize, &numMemoryBlocks);
+
+    /* create a memory region manager to manage the usage of the memory blocks */
+    /* note for simplicity memory region manager doesn't monitor memory regions so this code doesn't have to */
+    /* load memory blocks with new data during sending/receiving */
+    MemoryRegionManager* manager = createMemoryRegionManager(memoryBlocks,
+							     messageSize, numMemoryBlocks, numContiguousMessages, numTotalMessages, false);
+
+    /* if in send mode then populate the memory blocks and display contents to stdio */
+    if (mode == SEND_MODE)
+      {
+        if (dataFileName.c_str() != NULL)
+	  {
+            // read data from dataFileName.0, dataFileName.1, ... into memory blocks
+            if (!readFilesIntoMemoryBlocks(manager, dataFileName.c_str()))
+	      {
+                logger(LOG_WARNING, "Unsuccessful read of data files");
+	      }
+	  }
+        else
+	  {
+            /* put something into each allocated memory block to test sending */
+            for (uint32_t blockIndex=0; blockIndex<numMemoryBlocks; blockIndex++)
+	      {
+                for (uint64_t i=0; i<memoryBlockSize; i++)
+		  {
+                    ((unsigned char*)memoryBlocks[blockIndex])[i]
+		      = (unsigned char)(i+(blockIndex*memoryBlockSize));
+		  }
+	      }
+	  }
+        setAllMemoryRegionsPopulated(manager, true);
+        displayMemoryBlocks(manager, 10, 10); /* display contents that will send */
+      }
+    else
+      {
+        /* clear each memory block */
+        for (uint32_t blockIndex=0; blockIndex<numMemoryBlocks; blockIndex++)
+	  {
+            memset(memoryBlocks[blockIndex], 0, memoryBlockSize);
+	  }
+        setAllMemoryRegionsPopulated(manager, false);
+      }
+
+    /* create a pointer to an identifier exchange function (see eg RDMAexchangeidentifiers for some examples) */
+    enum exchangeResult (*identifierExchangeFunction)(bool isSendMode,
+						      uint32_t packetSequenceNumber, uint32_t queuePairNumber, union ibv_gid gidAddress, uint16_t localIdentifier,
+						      uint32_t *remotePSNPtr, uint32_t *remoteQPNPtr, union ibv_gid *remoteGIDPtr, uint16_t *remoteLIDPtr) = NULL;
+    if (identifierFileName.c_str() != NULL)
+      {
+        setIdentifierFileName(identifierFileName.c_str());
+        identifierExchangeFunction = exchangeViaSharedFiles;
+      }
+
   }
   
   virtual ~RdmaTransport()
@@ -69,7 +140,7 @@ struct RdmaTransport {
 };
 
 PYBIND11_MODULE(rdma_transport, m) {
-    m.doc() = R"pbdoc(
+  m.doc() = R"pbdoc(
     RDMA transport pluggin
         -----------------------
 
@@ -81,46 +152,46 @@ PYBIND11_MODULE(rdma_transport, m) {
 
     )pbdoc";
 
-    py::enum_<runMode>(m, "runMode")
-      .value("RECV_MODE", runMode{RECV_MODE})
-      .value("SEND_MODE", runMode{SEND_MODE})
-      .export_values();
+  py::enum_<runMode>(m, "runMode")
+    .value("RECV_MODE", runMode{RECV_MODE})
+    .value("SEND_MODE", runMode{SEND_MODE})
+    .export_values();
     
-    py::enum_<logType>(m, "logType")
-      .value("LOG_EMERG",   logType{LOG_EMERG})
-      .value("LOG_ALERT",   logType{LOG_ALERT})
-      .value("LOG_CRIT",    logType{LOG_CRIT})
-      .value("LOG_ERR",     logType{LOG_ERR})
-      .value("LOG_WARNING", logType{LOG_WARNING})
-      .value("LOG_NOTICE",  logType{LOG_NOTICE})
-      .value("LOG_INFO",    logType{LOG_INFO})
-      .value("LOG_DEBUG",   logType{LOG_DEBUG})
-      .export_values();
+  py::enum_<logType>(m, "logType")
+    .value("LOG_EMERG",   logType{LOG_EMERG})
+    .value("LOG_ALERT",   logType{LOG_ALERT})
+    .value("LOG_CRIT",    logType{LOG_CRIT})
+    .value("LOG_ERR",     logType{LOG_ERR})
+    .value("LOG_WARNING", logType{LOG_WARNING})
+    .value("LOG_NOTICE",  logType{LOG_NOTICE})
+    .value("LOG_INFO",    logType{LOG_INFO})
+    .value("LOG_DEBUG",   logType{LOG_DEBUG})
+    .export_values();
     
-    py::class_<RdmaTransport>(m, "RdmaTransport")
-      .def(py::init<enum logType,
-	   enum runMode,
-	   uint32_t, 
-	   uint32_t, 
-	   uint32_t, 
-	   const std::string &, 
-	   uint64_t, 
-	   uint32_t, 
-	   const std::string &, 
-	   uint8_t, 
-	   int, 
-	   const std::string &, 
-	   const std::string &,
-	   uint32_t>())
+  py::class_<RdmaTransport>(m, "RdmaTransport")
+    .def(py::init<enum logType,
+	 enum runMode,
+	 uint32_t, 
+	 uint32_t, 
+	 uint32_t, 
+	 const std::string &, 
+	 uint64_t, 
+	 uint32_t, 
+	 const std::string &, 
+	 uint8_t, 
+	 int, 
+	 const std::string &, 
+	 const std::string &,
+	 uint32_t>())
 
       
-      .def("say_hello", &RdmaTransport::say_hello)
-      .def("addition", &RdmaTransport::addition);
+    .def("say_hello", &RdmaTransport::say_hello)
+    .def("addition", &RdmaTransport::addition);
     
 
 #ifdef VERSION_INFO
-    m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);
+  m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);
 #else
-    m.attr("__version__") = "dev";
+  m.attr("__version__") = "dev";
 #endif
 }
