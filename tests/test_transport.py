@@ -35,46 +35,15 @@ def test_hello():
                       identifierFileName,
                       metricURL,
                       numMetricAveraging)
-    
+
     t.say_hello()
 
-def test_addition():
-    # To see print out in terminal, we need to run "pytest -s"
-    
-    requestLogLevel = logType.LOG_NOTICE;
-    mode = runMode.RECV_MODE;
-    messageSize = 65536
-    numMemoryBlocks = 1
-    numContiguousMessages = 1
-    dataFileName = " "
-    numTotalMessages = 0
-    messageDelayTime = 0
-    rdmaDeviceName = "mlx5_1"
-    rdmaPort = 1
-    gidIndex = -1
-    identifierFileName = " "
-    metricURL = " "
-    numMetricAveraging = 0
-    
     a = 2
     b = 3
-
-    t = RdmaTransport(requestLogLevel, 
-                      mode, 
-                      messageSize,
-                      numMemoryBlocks,
-                      numContiguousMessages,
-                      dataFileName,
-                      numTotalMessages,
-                      messageDelayTime,
-                      rdmaDeviceName,
-                      rdmaPort,
-                      gidIndex,
-                      identifierFileName,
-                      metricURL,
-                      numMetricAveraging)
 
     c = t.addition(a, b)
     
     assert c == (a+b)
     print(f"We get c = {c} with addition of {a} and {b}")
+    
+    t.sendRecvive()

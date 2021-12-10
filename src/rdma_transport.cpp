@@ -1,8 +1,8 @@
 #include "rdma_transport.hpp"
 extern "C" {
 #include "RDMAapi.h"
-#include "RDMAmemorymanager.h"
-#include "RDMAexchangeidcallbacks.h"
+//#include "RDMAmemorymanager.h"
+//#include "RDMAexchangeidcallbacks.h"
 }
 
 /**********************************************************************
@@ -45,7 +45,10 @@ struct receiveWorkRequestParams
 
 struct RdmaTransport {
   
-  /* set up default values that might be overriden when creating a instance of the class */
+  /*
+    set up default values that might be overriden when creating a instance of the class 
+    these setups are from outside
+*/
   enum logType requestLogLevel = LOG_NOTICE;
   enum runMode mode = RECV_MODE;
   uint32_t messageSize = 65536; /* size in bytes of single RDMA message */
@@ -60,6 +63,18 @@ struct RdmaTransport {
   std::string identifierFileName = NULL; /* default to using stdio for exchanging RDMA identifiers */
   std::string metricURL = NULL; /* default to not push metrics */
   uint32_t numMetricAveraging = 0; /* number of message completions over which to average metrics, default to numMemoryBlocks*numContiguousMessages */
+
+  /* setup when class instance is created */
+  struct ibv_context *rdmaDeviceContext;
+  struct ibv_comp_channel *eventChannel;
+  struct ibv_pd *protectionDomain;
+  struct ibv_cq *receiveCompletionQueue;
+  struct ibv_cq *sendCompletionQueue;
+  struct ibv_qp *queuePair;
+  MemoryRegionManager* manager;
+  uint32_t queueCapacity;
+  uint32_t maxInlineDataSize;
+  void **memoryBlocks;
   
   RdmaTransport(enum logType _requestLogLevel,
 		enum runMode _mode,
@@ -107,13 +122,13 @@ struct RdmaTransport {
 
     /* allocate memory blocks as buffers to be used in the memory regions */
     uint64_t memoryBlockSize = messageSize * numContiguousMessages;
-    void **memoryBlocks = allocateMemoryBlocks(memoryBlockSize, &numMemoryBlocks);
+    memoryBlocks = allocateMemoryBlocks(memoryBlockSize, &numMemoryBlocks);
 
     /* create a memory region manager to manage the usage of the memory blocks */
     /* note for simplicity memory region manager doesn't monitor memory regions so this code doesn't have to */
     /* load memory blocks with new data during sending/receiving */
-    MemoryRegionManager* manager = createMemoryRegionManager(memoryBlocks,
-							     messageSize, numMemoryBlocks, numContiguousMessages, numTotalMessages, false);
+    manager = createMemoryRegionManager(memoryBlocks,
+					messageSize, numMemoryBlocks, numContiguousMessages, numTotalMessages, false);
 
     /* if in send mode then populate the memory blocks and display contents to stdio */
     if (mode == SEND_MODE)
@@ -174,14 +189,9 @@ struct RdmaTransport {
     // enableForkProtection();
 
     /* allocate all the RDMA resources */
-    uint32_t queueCapacity = manager->numContiguousMessages * manager->numMemoryRegions ; /* minimum capacity for completion queues */
-    uint32_t maxInlineDataSize = 0; /* NOTE put back at 236 once testing completed */;
-    struct ibv_context *rdmaDeviceContext;
-    struct ibv_comp_channel *eventChannel;
-    struct ibv_pd *protectionDomain;
-    struct ibv_cq *receiveCompletionQueue;
-    struct ibv_cq *sendCompletionQueue;
-    struct ibv_qp *queuePair;
+    queueCapacity = manager->numContiguousMessages * manager->numMemoryRegions ; /* minimum capacity for completion queues */
+    maxInlineDataSize = 0; /* NOTE put back at 236 once testing completed */;
+
     if (allocateRDMAResources((char*)rdmaDeviceName.c_str(), rdmaPort, queueCapacity, maxInlineDataSize,
 			      &rdmaDeviceContext, &eventChannel, &protectionDomain, &receiveCompletionQueue,
 			      &sendCompletionQueue, &queuePair) != SUCCESS)
@@ -267,7 +277,11 @@ struct RdmaTransport {
       {
         logger(LOG_WARNING, "Unable to request send completion queue notifications");
       }
-    
+  }
+
+  void sendReceive(){
+
+    // Why sendWorkRequests and recvWorkRequests destory all information?
     if (mode == SEND_MODE)
       {
 	struct sendWorkRequestParams *params = NULL;
@@ -309,6 +323,25 @@ struct RdmaTransport {
   
   virtual ~RdmaTransport()
   {
+    /* if in receive mode then display contents to stdio */
+    if (mode == RECV_MODE)
+      {
+        if ((char *)dataFileName.c_str() != NULL)
+    	  {
+            // write data to dataFileName.0, dataFileName.1, ... from memory blocks
+            if (!writeFilesFromMemoryBlocks(manager, (char*)dataFileName.c_str()))
+    	      {
+                logger(LOG_WARNING, "Unsuccessful write of data files");
+    	      }
+    	  }
+        displayMemoryBlocks(manager, 10, 10); /* display contents that were received */
+      }
+    
+    destroyMemoryRegionManager(manager);
+    /* free memory block buffers */
+    freeMemoryBlocks(memoryBlocks, numMemoryBlocks);
+    
+    logger(LOG_INFO, "Receive Visibilities ending");
   }  
   
   int addition(int a, int b){
@@ -365,7 +398,7 @@ PYBIND11_MODULE(rdma_transport, m) {
 	 const std::string &,
 	 uint32_t>())
 
-      
+    .def("sendReceive", &RdmaTransport::sendReceive)
     .def("say_hello", &RdmaTransport::say_hello)
     .def("addition", &RdmaTransport::addition);
     
