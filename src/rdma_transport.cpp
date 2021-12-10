@@ -112,9 +112,12 @@ struct RdmaTransport {
   //int registerMemoryRegions(struct ibv_pd *protectionDomain,
   //			    MemoryRegionManager* manager);
   //
-  //int ibv_req_notify_cq(struct ibv_cq *cq,
-  //			int solicited_only);
-  //
+  int ibv_req_notify_cq_pybind11(struct ibv_cq *cq,
+				 int solicited_only){
+
+    return ibv_req_notify_cq(cq, solicited_only);
+  }
+  
   
   int addition(int a, int b){
     return a+b;
@@ -176,7 +179,7 @@ PYBIND11_MODULE(rdma_transport, m) {
       // **********************************************************************/
       //.def("registerMemoryRegions", &RdmaTransport::registerMemoryRegions)
 
-      //.def("ibv_req_notify_cq", &RdmaTransport::ibv_req_notify_cq)
+      .def("ibv_req_notify_cq_pybind11", &RdmaTransport::ibv_req_notify_cq_pybind11)
        
       .def("say_hello", &RdmaTransport::say_hello)
       .def("addition", &RdmaTransport::addition);
