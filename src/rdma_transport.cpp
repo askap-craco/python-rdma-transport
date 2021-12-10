@@ -12,10 +12,7 @@ struct RdmaTransport {
   uint8_t rdmaPort;
   uint32_t queueCapacity;
   uint32_t maxInlineDataSize;
-  
-  uint16_t localIdentifier;
-  union ibv_gid gidAddress;
-  enum ibv_mtu mtu;
+  enum runMode mode;
   
   struct ibv_context *rdmaDeviceContextPtr;
   struct ibv_comp_channel *eventChannelPtr;
@@ -23,17 +20,19 @@ struct RdmaTransport {
   struct ibv_cq *receiveCompletionQueuePtr;
   struct ibv_cq *sendCompletionQueuePtr;
   struct ibv_qp *queuePairPtr;
-
+  
   RdmaTransport(const std::string &_rdmaDeviceName,
                 uint8_t _rdmaPort,
                 uint32_t _queueCapacity,
                 uint32_t _maxInlineDataSize,
-		int _gidIndex) :
+		int _gidIndex,
+		enum runMode _mode) :
     rdmaDeviceName(_rdmaDeviceName),
     rdmaPort(_rdmaPort),
     queueCapacity(_queueCapacity),
     maxInlineDataSize(_maxInlineDataSize),
-    gidIndex(_gidIndex)
+    gidIndex(_gidIndex),
+    mode(_mode)
   {
     // SEE: RAII
     allocateRDMAResources((char*)rdmaDeviceName.c_str(),
@@ -48,7 +47,7 @@ struct RdmaTransport {
                           &queuePairPtr);
     
   }
-
+  
   virtual ~RdmaTransport()
   {
     cleanupRDMAResources(rdmaDeviceContextPtr,
@@ -58,7 +57,11 @@ struct RdmaTransport {
                          sendCompletionQueuePtr,
                          queuePairPtr);
   }
-
+  
+  uint16_t localIdentifier;
+  union ibv_gid gidAddress;
+  enum ibv_mtu mtu;
+  
   int setupRDMAConnectionPybind11()
   {
     return setupRDMAConnection(rdmaDeviceContextPtr,
@@ -68,16 +71,29 @@ struct RdmaTransport {
 			       &gidIndex,
 			       &mtu);
   }
-  //
-  //enum exchangeResult exchangeViaStdIO(bool isSendMode,
-  //				       uint32_t packetSequenceNumber,
-  //				       uint32_t queuePairNumber,
-  //				       union ibv_gid gidAddress,
-  //				       uint16_t localIdentifier,
-  //				       uint32_t *remotePSNPtr,
-  //				       uint32_t *remoteQPNPtr,
-  //				       union ibv_gid *remoteGIDPtr,
-  //				       uint16_t *remoteLIDPtr);
+  
+ 
+  uint32_t remotePSN;
+  uint32_t remoteQPN;
+  union ibv_gid remoteGID;
+  uint16_t remoteLID;
+  uint32_t packetSequenceNumber;
+  
+  enum exchangeResult exchangeViaStdIOPybind11()
+  {
+    srand(getpid() * time(NULL));
+    packetSequenceNumber = (uint32_t) (rand() & 0x00FFFFFF);
+    
+    return exchangeViaStdIO(mode==SEND_MODE,
+			    packetSequenceNumber,
+			    queuePairPtr->qp_num,
+			    gidAddress,
+			    localIdentifier,
+			    &remotePSN,
+			    &remoteQPN,
+			    &remoteGID,
+			    &remoteLID);
+  }
   
   //int modifyQueuePairReady(struct ibv_qp *queuePair,
   //			   uint8_t rdmaPort,
@@ -96,6 +112,7 @@ struct RdmaTransport {
   //int ibv_req_notify_cq(struct ibv_cq *cq,
   //			int solicited_only);
   //
+  
   int addition(int a, int b){
     return a+b;
   }
@@ -118,12 +135,18 @@ PYBIND11_MODULE(rdma_transport, m) {
 
     )pbdoc";
 
+    py::enum_<runMode>(m, "runMode")
+      .value("RECV_MODE", runMode{RECV_MODE})
+      .value("SEND_MODE", runMode{SEND_MODE})
+      .export_values();
+    
     py::class_<RdmaTransport>(m, "RdmaTransport")
       .def(py::init<const std::string &,
 	   uint8_t ,
 	   uint32_t ,
 	   uint32_t,
-	   int >())
+	   int,
+	   enum runMode>())
       
       /**********************************************************************
        * Sets up the RDMA connection and return its details in the
@@ -131,14 +154,14 @@ PYBIND11_MODULE(rdma_transport, m) {
        **********************************************************************/
       .def("setupRDMAConnectionPybind11", &RdmaTransport::setupRDMAConnectionPybind11)
       
-      ///**********************************************************************
-      // * Exchanges the necessary RDMA configuration identifiers with those of
-      // * the remote RDMA peer, by printing the local values to the display
-      // * and prompting the user to enter the remote values
-      // * Returns EXCH_SUCCESS if identifier exchange has completed successfully
-      // **********************************************************************/
-      //.def("exchangeViaStdIO", &RdmaTransport::exchangeViaStdIO)
-      //
+      /**********************************************************************
+       * Exchanges the necessary RDMA configuration identifiers with those of
+       * the remote RDMA peer, by printing the local values to the display
+       * and prompting the user to enter the remote values
+       * Returns EXCH_SUCCESS if identifier exchange has completed successfully
+       **********************************************************************/
+      .def("exchangeViaStdIOPybind11", &RdmaTransport::exchangeViaStdIOPybind11)
+      
       ///**********************************************************************
       // * Modifies the queue pair so that it is ready to receive
       // * and possibly to also send
