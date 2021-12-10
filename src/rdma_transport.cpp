@@ -29,7 +29,7 @@ struct RdmaTransport {
   {
     // SEE: RAII
 
-    if(allocateRDMAResources((char*)rdmaDeviceName.c_str(),
+    allocateRDMAResources((char*)rdmaDeviceName.c_str(),
                           rdmaPort,
                           queueCapacity,
                           maxInlineDataSize,
@@ -38,10 +38,7 @@ struct RdmaTransport {
                           &protectionDomainPtr,
                           &receiveCompletionQueuePtr,
                           &sendCompletionQueuePtr,
-                             &queuePairPtr) != SUCCESS) {
-      throw std::bad_alloc();
-    }
-
+                          &queuePairPtr);
     
   }
 
@@ -52,6 +49,17 @@ struct RdmaTransport {
                          receiveCompletionQueuePtr,
                          sendCompletionQueuePtr,
                          queuePairPtr);
+  }
+
+  int setupRDMAConnection(struct ibv_context *rdmaDeviceContext,
+			  uint8_t rdmaPort,
+			  uint16_t *localIdentifierPtr,
+			  union ibv_gid *gidAddressPtr,
+			  int *gidIndexPtr,
+			  enum ibv_mtu *mtuPtr);
+
+  int addition(int a, int b){
+    return a+b;
   }
   
   void say_hello() {
@@ -77,7 +85,8 @@ PYBIND11_MODULE(rdma_transport, m) {
                       uint8_t ,
                       uint32_t ,
                       uint32_t >())
-      .def("say_hello", &RdmaTransport::say_hello);
+      .def("say_hello", &RdmaTransport::say_hello)
+      .def("addition", &RdmaTransport::addition);
     
 
 #ifdef VERSION_INFO
