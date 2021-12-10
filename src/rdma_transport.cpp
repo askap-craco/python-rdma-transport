@@ -36,7 +36,6 @@ struct RdmaTransport {
     gidIndex(_gidIndex)
   {
     // SEE: RAII
-
     allocateRDMAResources((char*)rdmaDeviceName.c_str(),
                           rdmaPort,
                           queueCapacity,
@@ -50,7 +49,8 @@ struct RdmaTransport {
     
   }
 
-  virtual ~RdmaTransport() {
+  virtual ~RdmaTransport()
+  {
     cleanupRDMAResources(rdmaDeviceContextPtr,
                          eventChannelPtr,
                          protectionDomainPtr,
@@ -59,28 +59,16 @@ struct RdmaTransport {
                          queuePairPtr);
   }
 
-  //int setupRDMAConnection(rdmaDeviceContextPtr,
-  //			  rdmaPort,
-  //			  &localIdentifierPtr,
-  //			  &gidAddressPtr,
-  //			  &gidIndexPtr,
-  //			  &mtuPtr);
-
-  int setupRDMAConnectionPybind11(struct ibv_context *rdmaDeviceContext,
-				  uint8_t rdmaPort,
-				  uint16_t *localIdentifierPtr,
-				  union ibv_gid *gidAddressPtr,
-				  int *gidIndexPtr,
-				  enum ibv_mtu *mtuPtr){
-
-    setupRDMAConnection(rdmaDeviceContextPtr,
-			rdmaPort,
-			localIdentifierPtr,
-			gidAddressPtr,
-			gidIndexPtr,
-			mtuPtr);
+  int setupRDMAConnectionPybind11()
+  {
+    return setupRDMAConnection(rdmaDeviceContextPtr,
+			       rdmaPort,
+			       &localIdentifier,
+			       &gidAddress,
+			       &gidIndex,
+			       &mtu);
   }
-  
+  //
   //enum exchangeResult exchangeViaStdIO(bool isSendMode,
   //				       uint32_t packetSequenceNumber,
   //				       uint32_t queuePairNumber,
@@ -90,7 +78,7 @@ struct RdmaTransport {
   //				       uint32_t *remoteQPNPtr,
   //				       union ibv_gid *remoteGIDPtr,
   //				       uint16_t *remoteLIDPtr);
-  //
+  
   //int modifyQueuePairReady(struct ibv_qp *queuePair,
   //			   uint8_t rdmaPort,
   //			   int gidIndex,
