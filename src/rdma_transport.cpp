@@ -1,11 +1,47 @@
 #include "rdma_transport.hpp"
 extern "C" {
 #include "RDMAapi.h"
+#include "RDMAmemorymanager.h"
 #include "RDMAexchangeidcallbacks.h"
 }
 
-#include <stdio.h>
-#include <stdexcept>
+/**********************************************************************
+ * struct that holds parameters for sendWorkRequests
+ **********************************************************************/
+struct sendWorkRequestParams
+{
+    MemoryRegionManager* manager;
+    struct ibv_qp *queuePair;
+    struct ibv_comp_channel *eventChannel;
+    uint32_t messageDelayTime;
+    uint32_t maxInlineDataSize;
+    struct ibv_cq *sendCompletionQueue;
+    uint32_t queueCapacity;
+    char *metricURL;
+    uint32_t numMetricAveraging;
+    struct ibv_context *rdmaDeviceContext; // required for cleanup once transfers completed
+    struct ibv_pd *protectionDomain; // required for cleanup once transfers completed
+    struct ibv_cq *receiveCompletionQueue; // required for cleanup once transfers completed
+};
+
+
+/**********************************************************************
+ * struct that holds parameters for receiveWorkRequests
+ **********************************************************************/
+struct receiveWorkRequestParams
+{
+    MemoryRegionManager* manager;
+    struct ibv_qp *queuePair;
+    struct ibv_comp_channel *eventChannel;
+    uint32_t messageDelayTime;
+    struct ibv_cq *receiveCompletionQueue;
+    uint32_t queueCapacity;
+    char *metricURL;
+    uint32_t numMetricAveraging;
+    struct ibv_context *rdmaDeviceContext; // required for cleanup once transfers completed
+    struct ibv_pd *protectionDomain; // required for cleanup once transfers completed
+    struct ibv_cq *sendCompletionQueue; // required for cleanup once transfers completed
+};
 
 struct RdmaTransport {
   
@@ -151,7 +187,7 @@ struct RdmaTransport {
 			      &sendCompletionQueue, &queuePair) != SUCCESS)
       {
         logger(LOG_CRIT, "Unable to allocate the RDMA resources");
-        throw std::invalid_argument( "received negative value" );
+        exit(FAILURE);
       }
     else
       logger(LOG_DEBUG, "RDMA resources allocated");
@@ -164,7 +200,7 @@ struct RdmaTransport {
 			    &gidAddress, &gidIndex, &mtu) != SUCCESS)
       {
         logger(LOG_CRIT, "Unable to set up the RDMA connection");
-        throw std::invalid_argument( "received negative value" );
+        exit(FAILURE);
       }
     else
       logger(LOG_DEBUG, "RDMA connection set up");
@@ -188,7 +224,7 @@ struct RdmaTransport {
 			     &remotePSN, &remoteQPN, &remoteGID, &remoteLID) != EXCH_SUCCESS)
 	  {
             logger(LOG_CRIT, "Unable to exchange identifiers via standard IO");
-            throw std::invalid_argument( "received negative value" );
+            exit(FAILURE);
 	  }
       }
     else
@@ -198,7 +234,7 @@ struct RdmaTransport {
 				       &remotePSN, &remoteQPN, &remoteGID, &remoteLID) != EXCH_SUCCESS)
 	  {
             logger(LOG_CRIT, "Unable to exchange identifiers via provided exchange function");
-            throw std::invalid_argument( "received negative value" );
+            exit(FAILURE);
 	  }
 
       }
@@ -208,7 +244,7 @@ struct RdmaTransport {
 			     remotePSN, remoteQPN, remoteGID, remoteLID, mtu) != SUCCESS)
       {
         logger(LOG_CRIT, "Unable to modify queue pair to be ready");
-        throw std::invalid_argument( "received negative value" );
+        exit(FAILURE);
       }
     else
       logger(LOG_DEBUG, "Queue pair modified to be ready");
@@ -217,7 +253,7 @@ struct RdmaTransport {
     if (registerMemoryRegions(protectionDomain, manager) != SUCCESS)
       {
         logger(LOG_CRIT, "Unable to allocate memory regions");
-        throw std::invalid_argument( "received negative value" );
+        exit(FAILURE);
       }
 
     /* perform the rdma data transfer */
@@ -225,13 +261,50 @@ struct RdmaTransport {
       {
         logger(LOG_ERR, "Unable to request receive completion queue notifications");
         if (mode == RECV_MODE)
-	  throw std::invalid_argument( "received negative value" );
+	  exit(FAILURE);
       }
     if (ibv_req_notify_cq(sendCompletionQueue, 0) != SUCCESS)
       {
         logger(LOG_WARNING, "Unable to request send completion queue notifications");
       }
+    
+    if (mode == SEND_MODE)
+      {
+	struct sendWorkRequestParams *params = NULL;
+	params = (struct sendWorkRequestParams*)malloc(sizeof(struct sendWorkRequestParams)); // freed in sendWorkRequests
+	params->manager = manager;
+	params->queuePair = queuePair;
+	params->eventChannel = eventChannel;
+	params->messageDelayTime = messageDelayTime;
+	params->maxInlineDataSize = maxInlineDataSize;
+	params->sendCompletionQueue = sendCompletionQueue;
+	params->queueCapacity = queueCapacity;
+	params->metricURL = (char*)metricURL.c_str();
+	params->numMetricAveraging = numMetricAveraging;
+	params->rdmaDeviceContext = rdmaDeviceContext;
+	params->protectionDomain = protectionDomain;
+	params->receiveCompletionQueue = receiveCompletionQueue;
+	sendWorkRequests(params);
+      }
+    else /* mode == RECV_MODE */
+      {
+        struct receiveWorkRequestParams *params = NULL;
+        params = (struct receiveWorkRequestParams*)malloc(sizeof(struct receiveWorkRequestParams)); // freed in receiveWorkRequests
+        params->manager = manager;
+        params->queuePair = queuePair;
+        params->eventChannel = eventChannel;
+        params->messageDelayTime = messageDelayTime;
+        params->receiveCompletionQueue = receiveCompletionQueue;
+        params->queueCapacity = queueCapacity;
+        params->metricURL = (char*)metricURL.c_str();
+        params->numMetricAveraging = numMetricAveraging;
+        params->rdmaDeviceContext = rdmaDeviceContext;
+        params->protectionDomain = protectionDomain;
+        params->sendCompletionQueue = sendCompletionQueue;
+	receiveWorkRequests(params);
+      }
 
+    logger(LOG_INFO, "Receive Visibilities ending");
   }
   
   virtual ~RdmaTransport()
