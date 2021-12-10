@@ -4,8 +4,9 @@ def test_hello():
     # From the C sources aboutmaxIlinedadtaSize
     # must be zero NOTE put back at 236 once testing completed
     maxInlineDataSize = 0; 
+    gidIndex = 0;
     
-    t = RdmaTransport('mlx5_1', 1, 4, maxInlineDataSize)
+    t = RdmaTransport('mlx5_1', 1, 4, maxInlineDataSize, gidIndex)
     t.say_hello()
 
 def test_addition():
@@ -14,9 +15,10 @@ def test_addition():
     a = 2
     b = 3
 
-    maxInlineDataSize = 0; 
+    maxInlineDataSize = 0;
+    gidIndex = 0
     
-    t = RdmaTransport('mlx5_1', 1, 4, maxInlineDataSize)
+    t = RdmaTransport('mlx5_1', 1, 4, maxInlineDataSize, gidIndex)
 
     c = t.addition(a, b)
     
