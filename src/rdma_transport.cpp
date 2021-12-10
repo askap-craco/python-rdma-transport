@@ -95,17 +95,20 @@ struct RdmaTransport {
 			    &remoteLID);
   }
   
-  //int modifyQueuePairReady(struct ibv_qp *queuePair,
-  //			   uint8_t rdmaPort,
-  //			   int gidIndex,
-  //			   enum runMode mode,
-  //			   int packetSequenceNumber,
-  //			   uint32_t remotePSN,
-  //			   uint32_t remoteQPN,
-  //			   union ibv_gid remoteGID,
-  //			   uint16_t remoteLID,
-  //			   enum ibv_mtu mtu);
-  //
+  int modifyQueuePairReadyPybind11()
+  {  
+    return modifyQueuePairReady(queuePairPtr,
+				rdmaPort,
+				gidIndex,
+				mode,
+				packetSequenceNumber,
+				remotePSN,
+				remoteQPN,
+				remoteGID,
+				remoteLID,
+				mtu);
+  }
+  
   //int registerMemoryRegions(struct ibv_pd *protectionDomain,
   //			    MemoryRegionManager* manager);
   //
@@ -162,12 +165,12 @@ PYBIND11_MODULE(rdma_transport, m) {
        **********************************************************************/
       .def("exchangeViaStdIOPybind11", &RdmaTransport::exchangeViaStdIOPybind11)
       
-      ///**********************************************************************
-      // * Modifies the queue pair so that it is ready to receive
-      // * and possibly to also send
-      // **********************************************************************/
-      //.def("modifyQueuePairReady", &RdmaTransport::modifyQueuePairReady)
-      //
+      /**********************************************************************
+       * Modifies the queue pair so that it is ready to receive
+       * and possibly to also send
+       **********************************************************************/
+      .def("modifyQueuePairReadyPybind11", &RdmaTransport::modifyQueuePairReadyPybind11)
+      
       ///**********************************************************************
       // * Registers memory regions with protection domain
       // **********************************************************************/
