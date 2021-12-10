@@ -29,7 +29,7 @@ struct RdmaTransport {
   {
     // SEE: RAII
 
-    allocateRDMAResources((char*)rdmaDeviceName.c_str(),
+    if(allocateRDMAResources((char*)rdmaDeviceName.c_str(),
                           rdmaPort,
                           queueCapacity,
                           maxInlineDataSize,
@@ -38,7 +38,10 @@ struct RdmaTransport {
                           &protectionDomainPtr,
                           &receiveCompletionQueuePtr,
                           &sendCompletionQueuePtr,
-                          &queuePairPtr);
+                             &queuePairPtr) != SUCCESS) {
+      throw std::bad_alloc();
+    }
+
     
   }
 
