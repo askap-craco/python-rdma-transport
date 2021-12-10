@@ -5,6 +5,7 @@ extern "C" {
 }
 
 #include <stdio.h>
+#include <stdexcept>
 
 struct RdmaTransport {
   
@@ -81,10 +82,10 @@ struct RdmaTransport {
     /* if in send mode then populate the memory blocks and display contents to stdio */
     if (mode == SEND_MODE)
       {
-        if (dataFileName.c_str() != NULL)
+        if ((char*)dataFileName.c_str() != NULL)
 	  {
             // read data from dataFileName.0, dataFileName.1, ... into memory blocks
-            if (!readFilesIntoMemoryBlocks(manager, dataFileName.c_str()))
+            if (!readFilesIntoMemoryBlocks(manager, (char*)dataFileName.c_str()))
 	      {
                 logger(LOG_WARNING, "Unsuccessful read of data files");
 	      }
@@ -118,10 +119,117 @@ struct RdmaTransport {
     enum exchangeResult (*identifierExchangeFunction)(bool isSendMode,
 						      uint32_t packetSequenceNumber, uint32_t queuePairNumber, union ibv_gid gidAddress, uint16_t localIdentifier,
 						      uint32_t *remotePSNPtr, uint32_t *remoteQPNPtr, union ibv_gid *remoteGIDPtr, uint16_t *remoteLIDPtr) = NULL;
-    if (identifierFileName.c_str() != NULL)
+    if ((char*)identifierFileName.c_str() != NULL)
       {
-        setIdentifierFileName(identifierFileName.c_str());
+        setIdentifierFileName((char*)identifierFileName.c_str());
         identifierExchangeFunction = exchangeViaSharedFiles;
+      }
+    if (numMetricAveraging == 0)
+      numMetricAveraging = manager->numMemoryRegions * manager->numContiguousMessages;
+
+    logger(LOG_INFO, "Receive Visibilities starting");
+    if (mode == SEND_MODE)
+      logger(LOG_INFO, "Running as sender");
+    else
+      logger(LOG_INFO, "Running as receiver");
+
+    /* initialise libibverb data structures so have fork() protection */
+    /* note this has a performance hit, and is optional */
+    // enableForkProtection();
+
+    /* allocate all the RDMA resources */
+    uint32_t queueCapacity = manager->numContiguousMessages * manager->numMemoryRegions ; /* minimum capacity for completion queues */
+    uint32_t maxInlineDataSize = 0; /* NOTE put back at 236 once testing completed */;
+    struct ibv_context *rdmaDeviceContext;
+    struct ibv_comp_channel *eventChannel;
+    struct ibv_pd *protectionDomain;
+    struct ibv_cq *receiveCompletionQueue;
+    struct ibv_cq *sendCompletionQueue;
+    struct ibv_qp *queuePair;
+    if (allocateRDMAResources((char*)rdmaDeviceName.c_str(), rdmaPort, queueCapacity, maxInlineDataSize,
+			      &rdmaDeviceContext, &eventChannel, &protectionDomain, &receiveCompletionQueue,
+			      &sendCompletionQueue, &queuePair) != SUCCESS)
+      {
+        logger(LOG_CRIT, "Unable to allocate the RDMA resources");
+        throw std::invalid_argument( "received negative value" );
+      }
+    else
+      logger(LOG_DEBUG, "RDMA resources allocated");
+
+    /* set up the RDMA connection */
+    uint16_t localIdentifier;
+    union ibv_gid gidAddress;
+    enum ibv_mtu mtu;
+    if (setupRDMAConnection(rdmaDeviceContext, rdmaPort, &localIdentifier,
+			    &gidAddress, &gidIndex, &mtu) != SUCCESS)
+      {
+        logger(LOG_CRIT, "Unable to set up the RDMA connection");
+        throw std::invalid_argument( "received negative value" );
+      }
+    else
+      logger(LOG_DEBUG, "RDMA connection set up");
+
+    logger(LOG_INFO, "RDMA connection initialised on local %s", mode ? "sender" : "receiver");
+
+    /* initialise the random number generator to generate a 24-bit psn */
+    srand(getpid() * time(NULL));
+    uint32_t packetSequenceNumber = (uint32_t) (rand() & 0x00FFFFFF);
+
+    /* exchange the necessary information with the remote RDMA peer */
+    uint32_t queuePairNumber = queuePair->qp_num;
+    uint32_t remotePSN;
+    uint32_t remoteQPN;
+    union ibv_gid remoteGID;
+    uint16_t remoteLID;
+    if (identifierExchangeFunction == NULL)
+      {
+        if (exchangeViaStdIO(mode==SEND_MODE,
+			     packetSequenceNumber, queuePairNumber, gidAddress, localIdentifier,
+			     &remotePSN, &remoteQPN, &remoteGID, &remoteLID) != EXCH_SUCCESS)
+	  {
+            logger(LOG_CRIT, "Unable to exchange identifiers via standard IO");
+            throw std::invalid_argument( "received negative value" );
+	  }
+      }
+    else
+      {
+        if (identifierExchangeFunction(mode==SEND_MODE,
+				       packetSequenceNumber, queuePairNumber, gidAddress, localIdentifier,
+				       &remotePSN, &remoteQPN, &remoteGID, &remoteLID) != EXCH_SUCCESS)
+	  {
+            logger(LOG_CRIT, "Unable to exchange identifiers via provided exchange function");
+            throw std::invalid_argument( "received negative value" );
+	  }
+
+      }
+
+    /* modify the queue pair to be ready to receive and possibly send */
+    if (modifyQueuePairReady(queuePair, rdmaPort, gidIndex, mode, packetSequenceNumber,
+			     remotePSN, remoteQPN, remoteGID, remoteLID, mtu) != SUCCESS)
+      {
+        logger(LOG_CRIT, "Unable to modify queue pair to be ready");
+        throw std::invalid_argument( "received negative value" );
+      }
+    else
+      logger(LOG_DEBUG, "Queue pair modified to be ready");
+
+    /* register memory blocks as memory regions for buffer */
+    if (registerMemoryRegions(protectionDomain, manager) != SUCCESS)
+      {
+        logger(LOG_CRIT, "Unable to allocate memory regions");
+        throw std::invalid_argument( "received negative value" );
+      }
+
+    /* perform the rdma data transfer */
+    if (ibv_req_notify_cq(receiveCompletionQueue, 0) != SUCCESS)
+      {
+        logger(LOG_ERR, "Unable to request receive completion queue notifications");
+        if (mode == RECV_MODE)
+	  throw std::invalid_argument( "received negative value" );
+      }
+    if (ibv_req_notify_cq(sendCompletionQueue, 0) != SUCCESS)
+      {
+        logger(LOG_WARNING, "Unable to request send completion queue notifications");
       }
 
   }
