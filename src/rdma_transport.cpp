@@ -7,113 +7,57 @@ extern "C" {
 #include <stdio.h>
 
 struct RdmaTransport {
-  int gidIndex;
-  std::string rdmaDeviceName;
-  uint8_t rdmaPort;
-  uint32_t queueCapacity;
-  uint32_t maxInlineDataSize;
-  enum runMode mode;
   
-  struct ibv_context *rdmaDeviceContextPtr;
-  struct ibv_comp_channel *eventChannelPtr;
-  struct ibv_pd *protectionDomainPtr;
-  struct ibv_cq *receiveCompletionQueuePtr;
-  struct ibv_cq *sendCompletionQueuePtr;
-  struct ibv_qp *queuePairPtr;
-
-  uint16_t localIdentifier;
-  union ibv_gid gidAddress;
-  enum ibv_mtu mtu;
-
-  RdmaTransport(const std::string &_rdmaDeviceName,
-                uint8_t _rdmaPort,
-                uint32_t _queueCapacity,
-                uint32_t _maxInlineDataSize,
+  /* set up default values that might be overriden when creating a instance of the class */
+  enum logType requestLogLevel = LOG_NOTICE;
+  enum runMode mode = RECV_MODE;
+  uint32_t messageSize = 65536; /* size in bytes of single RDMA message */
+  uint32_t numMemoryBlocks = 1; /* number of memory blocks to allocate for RDMA messages */
+  uint32_t numContiguousMessages = 1; /* number of contiguous messages to hold in each memory block */
+  std::string dataFileName = NULL; /* default to not loading (sender) nor saving (receiver) to file the data memory blocks */
+  uint64_t numTotalMessages = 0; /* total number of messages to send or receive, if 0 then default to numMemoryBlocks*numContiguousMessages */
+  uint32_t messageDelayTime = 0; /* time in milliseconds to delay after each message send/receive posted, default is no delay */
+  std::string rdmaDeviceName = NULL; /* no preferred rdma device name to choose */
+  uint8_t rdmaPort = 1;
+  int gidIndex = -1; /* preferred gid index or -1 for no preference */
+  std::string identifierFileName = NULL; /* default to using stdio for exchanging RDMA identifiers */
+  std::string metricURL = NULL; /* default to not push metrics */
+  uint32_t numMetricAveraging = 0; /* number of message completions over which to average metrics, default to numMemoryBlocks*numContiguousMessages */
+  
+  RdmaTransport(enum logType _requestLogLevel,
+		enum runMode _mode,
+		uint32_t _messageSize,
+		uint32_t _numMemoryBlocks,
+		uint32_t _numContiguousMessages,
+		const std::string &_dataFileName,
+		uint64_t _numTotalMessages,
+		uint32_t _messageDelayTime,
+		const std::string &_rdmaDeviceName,
+		uint8_t _rdmaPort,
 		int _gidIndex,
-		enum runMode _mode) :
+		const std::string &_identifierFileName,
+		const std::string &_metricURL,
+		uint32_t _numMetricAveraging) :
+    requestLogLevel(_requestLogLevel),
+    mode(_mode),
+    messageSize(_messageSize),
+    numMemoryBlocks(_numMemoryBlocks),
+    numContiguousMessages(_numContiguousMessages),
+    dataFileName(_dataFileName),
+    numTotalMessages(_numTotalMessages),
+    messageDelayTime(_messageDelayTime),
     rdmaDeviceName(_rdmaDeviceName),
     rdmaPort(_rdmaPort),
-    queueCapacity(_queueCapacity),
-    maxInlineDataSize(_maxInlineDataSize),
     gidIndex(_gidIndex),
-    mode(_mode)
+    identifierFileName(_identifierFileName),
+    metricURL(_metricURL),
+    numMetricAveraging(_numMetricAveraging)   
   {
-    // SEE: RAII
-    allocateRDMAResources((char*)rdmaDeviceName.c_str(),
-                          rdmaPort,
-                          queueCapacity,
-                          maxInlineDataSize,
-                          &rdmaDeviceContextPtr,
-                          &eventChannelPtr,
-                          &protectionDomainPtr,
-                          &receiveCompletionQueuePtr,
-                          &sendCompletionQueuePtr,
-                          &queuePairPtr);
-   
-    setupRDMAConnection(rdmaDeviceContextPtr,
-			rdmaPort,
-			&localIdentifier,
-			&gidAddress,
-			&gidIndex,
-			&mtu); 
   }
   
   virtual ~RdmaTransport()
   {
-    cleanupRDMAResources(rdmaDeviceContextPtr,
-                         eventChannelPtr,
-                         protectionDomainPtr,
-                         receiveCompletionQueuePtr,
-                         sendCompletionQueuePtr,
-                         queuePairPtr);
-  }
-  
-  uint32_t remotePSN;
-  uint32_t remoteQPN;
-  union ibv_gid remoteGID;
-  uint16_t remoteLID;
-  uint32_t packetSequenceNumber;
-  
-  enum exchangeResult exchangeViaStdIOPybind11()
-  {
-    srand(getpid() * time(NULL));
-    packetSequenceNumber = (uint32_t) (rand() & 0x00FFFFFF);
-    
-    return exchangeViaStdIO(mode==SEND_MODE,
-			    packetSequenceNumber,
-			    queuePairPtr->qp_num,
-			    gidAddress,
-			    localIdentifier,
-			    &remotePSN,
-			    &remoteQPN,
-			    &remoteGID,
-			    &remoteLID);
-  }
-  
-  int modifyQueuePairReadyPybind11()
-  {  
-    return modifyQueuePairReady(queuePairPtr,
-				rdmaPort,
-				gidIndex,
-				mode,
-				packetSequenceNumber,
-				remotePSN,
-				remoteQPN,
-				remoteGID,
-				remoteLID,
-				mtu);
-  }
-  
-  //int registerMemoryRegions(struct ibv_pd *protectionDomain,
-  //			    MemoryRegionManager* manager);
-  //
-  
-  int ibv_req_notify_cq_pybind11(struct ibv_cq *cq,
-				 int solicited_only){
-
-    return ibv_req_notify_cq(cq, solicited_only);
-  }
-  
+  }  
   
   int addition(int a, int b){
     return a+b;
@@ -142,35 +86,34 @@ PYBIND11_MODULE(rdma_transport, m) {
       .value("SEND_MODE", runMode{SEND_MODE})
       .export_values();
     
+    py::enum_<logType>(m, "logType")
+      .value("LOG_EMERG",   logType{LOG_EMERG})
+      .value("LOG_ALERT",   logType{LOG_ALERT})
+      .value("LOG_CRIT",    logType{LOG_CRIT})
+      .value("LOG_ERR",     logType{LOG_ERR})
+      .value("LOG_WARNING", logType{LOG_WARNING})
+      .value("LOG_NOTICE",  logType{LOG_NOTICE})
+      .value("LOG_INFO",    logType{LOG_INFO})
+      .value("LOG_DEBUG",   logType{LOG_DEBUG})
+      .export_values();
+    
     py::class_<RdmaTransport>(m, "RdmaTransport")
-      .def(py::init<const std::string &,
-	   uint8_t ,
-	   uint32_t ,
-	   uint32_t,
-	   int,
-	   enum runMode>())
-      
-      /**********************************************************************
-       * Exchanges the necessary RDMA configuration identifiers with those of
-       * the remote RDMA peer, by printing the local values to the display
-       * and prompting the user to enter the remote values
-       * Returns EXCH_SUCCESS if identifier exchange has completed successfully
-       **********************************************************************/
-      .def("exchangeViaStdIOPybind11", &RdmaTransport::exchangeViaStdIOPybind11)
-      
-      /**********************************************************************
-       * Modifies the queue pair so that it is ready to receive
-       * and possibly to also send
-       **********************************************************************/
-      .def("modifyQueuePairReadyPybind11", &RdmaTransport::modifyQueuePairReadyPybind11)
-      
-      ///**********************************************************************
-      // * Registers memory regions with protection domain
-      // **********************************************************************/
-      //.def("registerMemoryRegions", &RdmaTransport::registerMemoryRegions)
+      .def(py::init<enum logType,
+	   enum runMode,
+	   uint32_t, 
+	   uint32_t, 
+	   uint32_t, 
+	   const std::string &, 
+	   uint64_t, 
+	   uint32_t, 
+	   const std::string &, 
+	   uint8_t, 
+	   int, 
+	   const std::string &, 
+	   const std::string &,
+	   uint32_t>())
 
-      .def("ibv_req_notify_cq_pybind11", &RdmaTransport::ibv_req_notify_cq_pybind11)
-       
+      
       .def("say_hello", &RdmaTransport::say_hello)
       .def("addition", &RdmaTransport::addition);
     

@@ -1,27 +1,78 @@
 from rdma_transport import RdmaTransport
 from rdma_transport import runMode
+from rdma_transport import logType
 
 def test_hello():
     # From the C sources aboutmaxIlinedadtaSize
     # must be zero NOTE put back at 236 once testing completed
-    maxInlineDataSize = 0; 
-    gidIndex = 0;
+    requestLogLevel = logType.LOG_NOTICE
     mode = runMode.RECV_MODE
+    messageSize = 65536
+    numMemoryBlocks = 1
+    numContiguousMessages = 1
+    dataFileName = " "
+    numTotalMessages = 0
+    messageDelayTime = 0
+    rdmaDeviceName = "mlx5_1"
+    rdmaPort = 1
+    gidIndex = -1
+    identifierFileName = " "
+    metricURL = " "
+    numMetricAveraging = 0
+
+  
+    t = RdmaTransport(requestLogLevel, 
+                      mode, 
+                      messageSize,
+                      numMemoryBlocks,
+                      numContiguousMessages,
+                      dataFileName,
+                      numTotalMessages,
+                      messageDelayTime,
+                      rdmaDeviceName,
+                      rdmaPort,
+                      gidIndex,
+                      identifierFileName,
+                      metricURL,
+                      numMetricAveraging)
     
-    t = RdmaTransport('mlx5_1', 1, 4, maxInlineDataSize, gidIndex, mode)
     t.say_hello()
 
 def test_addition():
     # To see print out in terminal, we need to run "pytest -s"
     
+    requestLogLevel = logType.LOG_NOTICE;
+    mode = runMode.RECV_MODE;
+    messageSize = 65536
+    numMemoryBlocks = 1
+    numContiguousMessages = 1
+    dataFileName = " "
+    numTotalMessages = 0
+    messageDelayTime = 0
+    rdmaDeviceName = "mlx5_1"
+    rdmaPort = 1
+    gidIndex = -1
+    identifierFileName = " "
+    metricURL = " "
+    numMetricAveraging = 0
+    
     a = 2
     b = 3
 
-    maxInlineDataSize = 0;
-    gidIndex = 0
-    mode = runMode.SEND_MODE
-    
-    t = RdmaTransport('mlx5_1', 1, 4, maxInlineDataSize, gidIndex, mode)
+    t = RdmaTransport(requestLogLevel, 
+                      mode, 
+                      messageSize,
+                      numMemoryBlocks,
+                      numContiguousMessages,
+                      dataFileName,
+                      numTotalMessages,
+                      messageDelayTime,
+                      rdmaDeviceName,
+                      rdmaPort,
+                      gidIndex,
+                      identifierFileName,
+                      metricURL,
+                      numMetricAveraging)
 
     c = t.addition(a, b)
     
