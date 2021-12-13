@@ -54,14 +54,14 @@ struct RdmaTransport {
   uint32_t messageSize = 65536; /* size in bytes of single RDMA message */
   uint32_t numMemoryBlocks = 1; /* number of memory blocks to allocate for RDMA messages */
   uint32_t numContiguousMessages = 1; /* number of contiguous messages to hold in each memory block */
-  std::string dataFileName = NULL; /* default to not loading (sender) nor saving (receiver) to file the data memory blocks */
+  std::string dataFileName = nullptr; /* default to not loading (sender) nor saving (receiver) to file the data memory blocks */
   uint64_t numTotalMessages = 0; /* total number of messages to send or receive, if 0 then default to numMemoryBlocks*numContiguousMessages */
   uint32_t messageDelayTime = 0; /* time in milliseconds to delay after each message send/receive posted, default is no delay */
-  std::string rdmaDeviceName = NULL; /* no preferred rdma device name to choose */
+  std::string rdmaDeviceName = nullptr; /* no preferred rdma device name to choose */
   uint8_t rdmaPort = 1;
   int gidIndex = -1; /* preferred gid index or -1 for no preference */
-  std::string identifierFileName = NULL; /* default to using stdio for exchanging RDMA identifiers */
-  std::string metricURL = NULL; /* default to not push metrics */
+  std::string identifierFileName = nullptr; /* default to using stdio for exchanging RDMA identifiers */
+  std::string metricURL = nullptr; /* default to not push metrics */
   uint32_t numMetricAveraging = 0; /* number of message completions over which to average metrics, default to numMemoryBlocks*numContiguousMessages */
 
   /* setup when class instance is created */
@@ -75,6 +75,9 @@ struct RdmaTransport {
   uint32_t queueCapacity;
   uint32_t maxInlineDataSize;
   void **memoryBlocks;
+
+  struct ibv_recv_wr **receiveRequests;
+  struct ibv_send_wr **sendRequests;
   
   RdmaTransport(enum logType _requestLogLevel,
 		enum runMode _mode,
@@ -133,7 +136,7 @@ struct RdmaTransport {
     /* if in send mode then populate the memory blocks and display contents to stdio */
     if (mode == SEND_MODE)
       {
-        if ((char*)dataFileName.c_str() != NULL)
+        if ((char*)dataFileName.c_str() != nullptr)
 	  {
             // read data from dataFileName.0, dataFileName.1, ... into memory blocks
             if (!readFilesIntoMemoryBlocks(manager, (char*)dataFileName.c_str()))
@@ -169,8 +172,8 @@ struct RdmaTransport {
     /* create a pointer to an identifier exchange function (see eg RDMAexchangeidentifiers for some examples) */
     enum exchangeResult (*identifierExchangeFunction)(bool isSendMode,
 						      uint32_t packetSequenceNumber, uint32_t queuePairNumber, union ibv_gid gidAddress, uint16_t localIdentifier,
-						      uint32_t *remotePSNPtr, uint32_t *remoteQPNPtr, union ibv_gid *remoteGIDPtr, uint16_t *remoteLIDPtr) = NULL;
-    if ((char*)identifierFileName.c_str() != NULL)
+						      uint32_t *remotePSNPtr, uint32_t *remoteQPNPtr, union ibv_gid *remoteGIDPtr, uint16_t *remoteLIDPtr) = nullptr;
+    if ((char*)identifierFileName.c_str() != nullptr)
       {
         setIdentifierFileName((char*)identifierFileName.c_str());
         identifierExchangeFunction = exchangeViaSharedFiles;
@@ -218,7 +221,7 @@ struct RdmaTransport {
     logger(LOG_INFO, "RDMA connection initialised on local %s", mode ? "sender" : "receiver");
 
     /* initialise the random number generator to generate a 24-bit psn */
-    srand(getpid() * time(NULL));
+    srand(getpid() * time(nullptr));
     uint32_t packetSequenceNumber = (uint32_t) (rand() & 0x00FFFFFF);
 
     /* exchange the necessary information with the remote RDMA peer */
@@ -227,7 +230,7 @@ struct RdmaTransport {
     uint32_t remoteQPN;
     union ibv_gid remoteGID;
     uint16_t remoteLID;
-    if (identifierExchangeFunction == NULL)
+    if (identifierExchangeFunction == nullptr)
       {
         if (exchangeViaStdIO(mode==SEND_MODE,
 			     packetSequenceNumber, queuePairNumber, gidAddress, localIdentifier,
@@ -276,49 +279,103 @@ struct RdmaTransport {
     if (ibv_req_notify_cq(sendCompletionQueue, 0) != SUCCESS)
       {
         logger(LOG_WARNING, "Unable to request send completion queue notifications");
-      }
+      }    
   }
 
-  void sendReceive(){
+  void setupRequests()
+  {
 
-    // Why sendWorkRequests and recvWorkRequests destory all information?
-    if (mode == SEND_MODE)
+    if (mode == RECV_MODE)
       {
-	struct sendWorkRequestParams *params = NULL;
-	params = (struct sendWorkRequestParams*)malloc(sizeof(struct sendWorkRequestParams)); // freed in sendWorkRequests
-	params->manager = manager;
-	params->queuePair = queuePair;
-	params->eventChannel = eventChannel;
-	params->messageDelayTime = messageDelayTime;
-	params->maxInlineDataSize = maxInlineDataSize;
-	params->sendCompletionQueue = sendCompletionQueue;
-	params->queueCapacity = queueCapacity;
-	params->metricURL = (char*)metricURL.c_str();
-	params->numMetricAveraging = numMetricAveraging;
-	params->rdmaDeviceContext = rdmaDeviceContext;
-	params->protectionDomain = protectionDomain;
-	params->receiveCompletionQueue = receiveCompletionQueue;
-	sendWorkRequests(params);
+	/* prepare scatter/gather array specifying buffers to read from or write into */
+	/* note this implementation uses only one sgItem per work request but chains together */
+	/* multiple work requests when numContiguousMessages > 1 */
+	/* Alternatively, could instead use multiple sge, but then need to adjust queue pair specs */
+	struct ibv_sge sgItems[manager->numMemoryRegions][manager->numContiguousMessages];
+	memset(sgItems, 0, sizeof(struct ibv_sge[manager->numMemoryRegions][manager->numContiguousMessages]));
+	int sgListLength = 1; /* only one sgItem per work request */
+      
+	/* Setup memory space for requests and reset it to 0*/
+	receiveRequests = (ibv_recv_wr**) calloc(manager->numMemoryRegions, sizeof(ibv_recv_wr*));
+	for(int i = 0; i < manager->numMemoryRegions; i++){
+	  receiveRequests[i] = (ibv_recv_wr*) calloc(manager->numContiguousMessages, sizeof(ibv_recv_wr));
+	}      
+	memset(receiveRequests, 0, sizeof(struct ibv_recv_wr[manager->numMemoryRegions][manager->numContiguousMessages]));
+	for (uint32_t regionIndex=0; regionIndex<manager->numMemoryRegions; regionIndex++)
+	  {
+	    for (uint32_t i=0; i<manager->numContiguousMessages; i++)
+	      {
+		/* prepare one sgItem to receive */
+		sgItems[regionIndex][i].addr = (uint64_t)(manager->memoryRegions[regionIndex]->addr + i*manager->messageSize);
+		sgItems[regionIndex][i].length = manager->messageSize;
+		sgItems[regionIndex][i].lkey = manager->memoryRegions[regionIndex]->lkey;
+
+		/* prepare one workRequest with this sgItem */
+		receiveRequests[regionIndex][i].wr_id = (uint64_t)(regionIndex*manager->numContiguousMessages + i); /* gives memory region and location */
+		receiveRequests[regionIndex][i].sg_list = &sgItems[regionIndex][i];
+		receiveRequests[regionIndex][i].num_sge = sgListLength;
+		if (i == manager->numContiguousMessages-1)
+		  {
+		    receiveRequests[regionIndex][i].next = NULL; /* note can chain multiple workRequest together for performance */
+		  }
+		else
+		  {
+		    receiveRequests[regionIndex][i].next = &receiveRequests[regionIndex][i+1]; /* chain multiple workRequest together for performance */
+		  }
+	      }
+	  }
       }
-    else /* mode == RECV_MODE */
+    else
       {
-        struct receiveWorkRequestParams *params = NULL;
-        params = (struct receiveWorkRequestParams*)malloc(sizeof(struct receiveWorkRequestParams)); // freed in receiveWorkRequests
-        params->manager = manager;
-        params->queuePair = queuePair;
-        params->eventChannel = eventChannel;
-        params->messageDelayTime = messageDelayTime;
-        params->receiveCompletionQueue = receiveCompletionQueue;
-        params->queueCapacity = queueCapacity;
-        params->metricURL = (char*)metricURL.c_str();
-        params->numMetricAveraging = numMetricAveraging;
-        params->rdmaDeviceContext = rdmaDeviceContext;
-        params->protectionDomain = protectionDomain;
-        params->sendCompletionQueue = sendCompletionQueue;
-	receiveWorkRequests(params);
+	/* prepare scatter/gather array specifying buffers to read from or write into */
+	/* note this implementation uses only one sgItem per work request but chains together */
+	/* multiple work requests when numContiguousMessages > 1 */
+	/* Alternatively, could instead use multiple sge, but then need to adjust queue pair specs */
+	struct ibv_sge sgItems[manager->numMemoryRegions][manager->numContiguousMessages];
+	memset(sgItems, 0, sizeof(struct ibv_sge[manager->numMemoryRegions][manager->numContiguousMessages]));
+	int sgListLength = 1; /* only one sgItem per work request */
+
+	/* Setup memory space for requests and reset it to 0*/
+	sendRequests = (ibv_send_wr**) calloc(manager->numMemoryRegions, sizeof(ibv_send_wr*));
+	for(int i = 0; i < manager->numMemoryRegions; i++){
+	  sendRequests[i] = (ibv_send_wr*) calloc(manager->numContiguousMessages, sizeof(ibv_recv_wr));
+	}
+	memset(sendRequests, 0, sizeof(struct ibv_send_wr[manager->numMemoryRegions][manager->numContiguousMessages]));
+	for (uint32_t regionIndex=0; regionIndex<manager->numMemoryRegions; regionIndex++)
+	  {
+	    for (uint32_t i=0; i<manager->numContiguousMessages; i++)
+	      {
+		/* prepare one sgItem to send */
+		sgItems[regionIndex][i].addr = (uint64_t)(manager->memoryRegions[regionIndex]->addr + i*manager->messageSize);
+		sgItems[regionIndex][i].length = manager->messageSize;
+		sgItems[regionIndex][i].lkey = manager->memoryRegions[regionIndex]->lkey;
+
+		/* prepare one workRequest with this sgItem */
+		sendRequests[regionIndex][i].wr_id = (uint64_t)(regionIndex*manager->numContiguousMessages + i); /* gives memory region and location */
+		sendRequests[regionIndex][i].sg_list = &sgItems[regionIndex][i];
+		sendRequests[regionIndex][i].num_sge = sgListLength;
+		sendRequests[regionIndex][i].opcode = IBV_WR_SEND_WITH_IMM;
+		if (manager->messageSize <= maxInlineDataSize)
+		  sendRequests[regionIndex][i].send_flags |= IBV_SEND_INLINE;
+		/* optional immediate data sent along with payload, set to be incrementing values with zero first as reset */
+		sendRequests[regionIndex][i].imm_data = (uint32_t)0; /* set appropriately prior to each ibv_post_send */
+		if (i == manager->numContiguousMessages-1)
+		  {
+		    sendRequests[regionIndex][i].next = NULL; /* note can chain multiple workRequest together for performance */
+		    sendRequests[regionIndex][i].send_flags = 0; // IBV_SEND_SIGNALED; /* include signal with last work request */
+		  }
+		else
+		  {
+		    sendRequests[regionIndex][i].next = &sendRequests[regionIndex][i+1]; /* chain multiple workRequest together for performance */
+		  }
+	      }
+	  }
       }
 
-    logger(LOG_INFO, "Receive Visibilities ending");
+    //void issueRequest(){
+    //  
+    //}
+    
   }
   
   virtual ~RdmaTransport()
@@ -326,7 +383,7 @@ struct RdmaTransport {
     /* if in receive mode then display contents to stdio */
     if (mode == RECV_MODE)
       {
-        if ((char *)dataFileName.c_str() != NULL)
+        if ((char *)dataFileName.c_str() != nullptr)
     	  {
             // write data to dataFileName.0, dataFileName.1, ... from memory blocks
             if (!writeFilesFromMemoryBlocks(manager, (char*)dataFileName.c_str()))
@@ -398,7 +455,7 @@ PYBIND11_MODULE(rdma_transport, m) {
 	 const std::string &,
 	 uint32_t>())
 
-    .def("sendReceive", &RdmaTransport::sendReceive)
+    .def("setupRequests", &RdmaTransport::setupRequests)
     .def("say_hello", &RdmaTransport::say_hello)
     .def("addition", &RdmaTransport::addition);
     
