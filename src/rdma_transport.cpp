@@ -5,44 +5,6 @@ extern "C" {
 //#include "RDMAexchangeidcallbacks.h"
 }
 
-/**********************************************************************
- * struct that holds parameters for sendWorkRequests
- **********************************************************************/
-struct sendWorkRequestParams
-{
-    MemoryRegionManager* manager;
-    struct ibv_qp *queuePair;
-    struct ibv_comp_channel *eventChannel;
-    uint32_t messageDelayTime;
-    uint32_t maxInlineDataSize;
-    struct ibv_cq *sendCompletionQueue;
-    uint32_t queueCapacity;
-    char *metricURL;
-    uint32_t numMetricAveraging;
-    struct ibv_context *rdmaDeviceContext; // required for cleanup once transfers completed
-    struct ibv_pd *protectionDomain; // required for cleanup once transfers completed
-    struct ibv_cq *receiveCompletionQueue; // required for cleanup once transfers completed
-};
-
-
-/**********************************************************************
- * struct that holds parameters for receiveWorkRequests
- **********************************************************************/
-struct receiveWorkRequestParams
-{
-    MemoryRegionManager* manager;
-    struct ibv_qp *queuePair;
-    struct ibv_comp_channel *eventChannel;
-    uint32_t messageDelayTime;
-    struct ibv_cq *receiveCompletionQueue;
-    uint32_t queueCapacity;
-    char *metricURL;
-    uint32_t numMetricAveraging;
-    struct ibv_context *rdmaDeviceContext; // required for cleanup once transfers completed
-    struct ibv_pd *protectionDomain; // required for cleanup once transfers completed
-    struct ibv_cq *sendCompletionQueue; // required for cleanup once transfers completed
-};
-
 struct RdmaTransport {
   
   /*
@@ -78,7 +40,28 @@ struct RdmaTransport {
 
   struct ibv_recv_wr **receiveRequests;
   struct ibv_send_wr **sendRequests;
+
+  /* setup for loop enqueueing blocks of work requests and polling for blocks of work completions */
+  uint32_t minWorkRequestEnqueue;
+  uint32_t maxWorkRequestDequeue;
+  struct ibv_wc *workCompletions = NULL;
+  uint32_t currentQueueLoading = 0; /* no work requests initially in queue */
+  uint64_t numWorkRequestsEnqueued = 0;
+  uint32_t previousImmediateData;
+  uint64_t numWorkRequestsMissing = 0; /* determined by finding non-incrementing immediate data values */
+  uint32_t regionIndex = 0;
+  uint64_t numWorkRequestCompletions = 0;
+
+  /* initialise receiver metrics */
+  uint64_t metricMessagesTransferred = 0;
+  clock_t metricStartClockTime = -1;
+  uint64_t metricWorkRequestsMissing = 0;
   
+  /* initialise sender metrics */
+  struct ibv_recv_wr *badReceiveRequest = NULL;
+  struct ibv_send_wr *badSendRequest = NULL;
+  struct timeval metricStartWallTime;
+    
   RdmaTransport(enum logType _requestLogLevel,
 		enum runMode _mode,
 		uint32_t _messageSize,
@@ -114,13 +97,13 @@ struct RdmaTransport {
       numMetricAveraging = numMemoryBlocks * numContiguousMessages;
     setLogLevel(requestLogLevel);
 
-    if (mode == SEND_MODE)
+    if (mode == RECV_MODE)
       {
-        logger(LOG_INFO, "Receive Visibilities starting as sender");
+        logger(LOG_INFO, "Receive Visibilities starting as receiver");
       }
     else
       {
-        logger(LOG_INFO, "Receive Visibilities starting as receiver");
+        logger(LOG_INFO, "Receive Visibilities starting as sender");
       }
 
     /* allocate memory blocks as buffers to be used in the memory regions */
@@ -134,7 +117,16 @@ struct RdmaTransport {
 					messageSize, numMemoryBlocks, numContiguousMessages, numTotalMessages, false);
 
     /* if in send mode then populate the memory blocks and display contents to stdio */
-    if (mode == SEND_MODE)
+    if (mode == RECV_MODE)
+      {
+        /* clear each memory block */
+        for (uint32_t blockIndex=0; blockIndex<numMemoryBlocks; blockIndex++)
+	  {
+            memset(memoryBlocks[blockIndex], 0, memoryBlockSize);
+	  }
+        setAllMemoryRegionsPopulated(manager, false);
+      }
+    else
       {
         if ((char*)dataFileName.c_str() != nullptr)
 	  {
@@ -159,15 +151,6 @@ struct RdmaTransport {
         setAllMemoryRegionsPopulated(manager, true);
         displayMemoryBlocks(manager, 10, 10); /* display contents that will send */
       }
-    else
-      {
-        /* clear each memory block */
-        for (uint32_t blockIndex=0; blockIndex<numMemoryBlocks; blockIndex++)
-	  {
-            memset(memoryBlocks[blockIndex], 0, memoryBlockSize);
-	  }
-        setAllMemoryRegionsPopulated(manager, false);
-      }
 
     /* create a pointer to an identifier exchange function (see eg RDMAexchangeidentifiers for some examples) */
     enum exchangeResult (*identifierExchangeFunction)(bool isSendMode,
@@ -182,10 +165,10 @@ struct RdmaTransport {
       numMetricAveraging = manager->numMemoryRegions * manager->numContiguousMessages;
 
     logger(LOG_INFO, "Receive Visibilities starting");
-    if (mode == SEND_MODE)
-      logger(LOG_INFO, "Running as sender");
-    else
+    if (mode == RECV_MODE)
       logger(LOG_INFO, "Running as receiver");
+    else
+      logger(LOG_INFO, "Running as sender");
 
     /* initialise libibverb data structures so have fork() protection */
     /* note this has a performance hit, and is optional */
@@ -279,7 +262,13 @@ struct RdmaTransport {
     if (ibv_req_notify_cq(sendCompletionQueue, 0) != SUCCESS)
       {
         logger(LOG_WARNING, "Unable to request send completion queue notifications");
-      }    
+      }
+
+    /* now create work requests*/
+    setupRequests();
+
+    /* Now setup for work completions */
+    setupCompletions();
   }
 
   void setupRequests()
@@ -370,14 +359,54 @@ struct RdmaTransport {
 		  }
 	      }
 	  }
-      }
-
-    //void issueRequest(){
-    //  
-    //}
-    
+      }    
   }
+
+  void setupCompletions()
+  {    
+    /* setup for loop enqueueing blocks of work requests and polling for blocks of work completions */
+    minWorkRequestEnqueue = (uint32_t) ceil(queueCapacity * MIN_WORK_REQUEST_ENQUEUE);
+    maxWorkRequestDequeue = queueCapacity; /* try to completely drain queue of any completed work requests */
+    workCompletions = (struct ibv_wc*)malloc(sizeof(struct ibv_wc) * maxWorkRequestDequeue);
+    if (workCompletions == NULL)
+      {
+	logger(LOG_ERR, "Receiver unable to allocate desired memory for work completions");
+	exit(FAILURE);
+      }
+    setAllMemoryRegionsEnqueued(manager, false); 
+    if (metricURL.c_str() != NULL)
+      {
+	initialiseMetricReporter();
+      }
+    currentQueueLoading = 0; /* no work requests initially in queue */
+    numWorkRequestsEnqueued = 0;
+    previousImmediateData = UINT32_MAX;
+    if (previousImmediateData+(uint32_t)1 != (uint32_t)0)
+      {
+	logger(LOG_ERR, "Assertion that UINT32_MAX+1 == 0 has failed, so error checking immediate values");
+      }
+    numWorkRequestsMissing = 0; /* determined by finding non-incrementing immediate data values */
+    regionIndex = 0;
+    numWorkRequestCompletions = 0;
+
+    /* initialise receiver metrics */
+    metricMessagesTransferred = 0;
+    metricStartClockTime = -1;
+    metricWorkRequestsMissing = 0;
   
+    /* initialise sender metrics */
+    if (mode == RECV_MODE)
+      {
+	metricStartClockTime = -1;
+      }
+    else
+      {
+	metricStartClockTime = clock();
+	gettimeofday(&metricStartWallTime, NULL);
+      }
+  
+  }
+
   virtual ~RdmaTransport()
   {
     /* if in receive mode then display contents to stdio */
@@ -455,7 +484,7 @@ PYBIND11_MODULE(rdma_transport, m) {
 	 const std::string &,
 	 uint32_t>())
 
-    .def("setupRequests", &RdmaTransport::setupRequests)
+    //.def("setupRequests", &RdmaTransport::setupRequests)
     .def("say_hello", &RdmaTransport::say_hello)
     .def("addition", &RdmaTransport::addition);
     
