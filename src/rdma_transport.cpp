@@ -404,9 +404,134 @@ struct RdmaTransport {
 	metricStartClockTime = clock();
 	gettimeofday(&metricStartWallTime, NULL);
       }
-  
   }
 
+  /*
+    This function only issue requests for minWorkRequestEnqueue
+   */
+  void issueRequests(){
+
+    if ( mode == RECV_MODE)
+      {	
+        /* post block of receive work requests to sufficiently full work request queue */
+        while ((numWorkRequestsEnqueued + numWorkRequestsMissing < manager->numTotalMessages)
+	       && (currentQueueLoading < minWorkRequestEnqueue))
+	  {
+            if (ibv_post_recv(queuePair, &receiveRequests[regionIndex][0], &badReceiveRequest) != SUCCESS)
+	      {
+                logger(LOG_ERR, "Unable to post receive request with error %d", errno);
+	      }
+            else
+	      {
+                logger(LOG_INFO, "Receiver has posted work requests for region %" PRIu32, regionIndex);
+                /* check that the memory region isn't already populated with data */
+                if (manager->isMonitoringRegions && getMemoryRegionPopulated(manager, regionIndex))
+		  {
+		    logger(LOG_WARNING, "Memory region %" PRIu32 " has been enqueued for receiving"
+			   " but already populated while enqueueing work request %" PRIu64,
+			   regionIndex, numWorkRequestsEnqueued + numWorkRequestsMissing);
+		  }
+                currentQueueLoading += manager->numContiguousMessages;
+                numWorkRequestsEnqueued += manager->numContiguousMessages;
+                setMemoryRegionEnqueued(manager, regionIndex, true);
+                regionIndex++;
+                if (regionIndex >= manager->numMemoryRegions)
+		  regionIndex = 0;
+                microSleep(messageDelayTime);
+	      }
+	  }
+      }
+    else
+      {	
+        /* post block of send work requests to sufficiently full work request queue */
+        while ((numWorkRequestsEnqueued < manager->numTotalMessages) && (currentQueueLoading < minWorkRequestEnqueue))
+	  {
+            /* provide incrementing immediate data sent along with payload */
+            for (uint32_t i=0; i<manager->numContiguousMessages; i++)
+	      {
+                sendRequests[regionIndex][i].imm_data = htonl(numWorkRequestsEnqueued+i);
+	      }
+            if (ibv_post_send(queuePair, &sendRequests[regionIndex][0], &badSendRequest) != SUCCESS)
+	      {
+                logger(LOG_ERR, "Unable to post send request with error %d", errno);
+	      }
+            else
+	      {
+                logger(LOG_INFO, "Sender has posted work requests for region %" PRIu32, regionIndex);
+                /* check that the memory region is already populated with data */
+                if (manager->isMonitoringRegions && !getMemoryRegionPopulated(manager, regionIndex))
+		  {
+                    logger(LOG_WARNING, "Memory region %" PRIu32 " has been enqueued for sending"
+			   " without first being populated while enqueing work request %" PRIu64,
+			   regionIndex, numWorkRequestsEnqueued);
+		  }
+                currentQueueLoading += manager->numContiguousMessages;
+                numWorkRequestsEnqueued += manager->numContiguousMessages;
+                setMemoryRegionEnqueued(manager, regionIndex, true);
+                regionIndex++;
+                if (regionIndex >= manager->numMemoryRegions)
+		  regionIndex = 0;
+                microSleep(messageDelayTime);
+	      }
+	  }
+      }
+  }
+
+  
+  /**********************************************************************
+   * Waits until a completion event is received on the eventChannel
+   * then acknowledge it and reset it to receive another notification that
+   * may come in future on that completion queue
+   * Note this function gets called by sendWorkRequests and receiveWorkRequests
+   * so does not need to be called directly
+   **********************************************************************/
+  int waitForCompletionQueueEvent()
+  {
+    /* wait until get completion queue event */
+    struct ibv_cq *eventCompletionQueue;
+    void *eventContext;
+    if (ibv_get_cq_event(eventChannel, &eventCompletionQueue, &eventContext) != SUCCESS)
+      {
+        logger(LOG_ERR, "Error while waiting for completion queue event");
+        return FAILURE;
+      }
+    /* assert: eventCompletionQueue is either receiveCompletionQueue or sendCompletionQueue */
+    /* assert: eventContext is rdmaDeviceContext */
+    /* acknowledge the one completion queue event */
+    ibv_ack_cq_events(eventCompletionQueue, 1);
+    /* request notification for next completion event on the completion queue */
+    if (ibv_req_notify_cq(eventCompletionQueue, 0) != SUCCESS)
+      {
+        logger(LOG_WARNING, "Error while receiver requesting completion notification");
+      }
+    return SUCCESS;
+  }
+  
+  /*
+    This function block previous work request until it finishes 
+  */
+  void waitForCompletion()
+  {
+    if ( mode == RECV_MODE)
+      {
+        /* poll for block of work completions */
+        logger(LOG_INFO, "Receiver waiting for completion %" PRIu64 " of %" PRIu64,
+	       numWorkRequestCompletions + numWorkRequestsMissing, manager->numTotalMessages);
+        if (waitForCompletionQueueEvent() != SUCCESS)
+	  {
+            logger(LOG_ERR, "Receiver unable to wait for completion notification");
+	  }
+      }
+    else
+      {
+        logger(LOG_INFO, "Sender waiting for completion %" PRIu64 " of %" PRIu64, numWorkRequestCompletions, manager->numTotalMessages);
+        if (waitForCompletionQueueEvent() != SUCCESS)
+	  {
+            logger(LOG_ERR, "Sender unable to wait for completion notification");
+	  }
+      }
+  }
+  
   virtual ~RdmaTransport()
   {
     /* if in receive mode then display contents to stdio */
@@ -484,11 +609,11 @@ PYBIND11_MODULE(rdma_transport, m) {
 	 const std::string &,
 	 uint32_t>())
 
-    //.def("setupRequests", &RdmaTransport::setupRequests)
+    .def("issueRequests", &RdmaTransport::issueRequests)
+    .def("waitForCompletion", &RdmaTransport::waitForCompletion)
     .def("say_hello", &RdmaTransport::say_hello)
     .def("addition", &RdmaTransport::addition);
-    
-
+  
 #ifdef VERSION_INFO
   m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);
 #else
