@@ -619,6 +619,9 @@ PYBIND11_MODULE(rdma_transport, m) {
     .value("LOG_DEBUG",   logType{LOG_DEBUG})
     .export_values();
 
+
+  // expose ibv_cq struct to python
+  py::class_<ibv_cq>(m, "ibv_cq");
   
   py::class_<RdmaTransport>(m, "RdmaTransport")
     .def(py::init<enum logType,
