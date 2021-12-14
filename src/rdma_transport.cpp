@@ -635,7 +635,9 @@ PYBIND11_MODULE(rdma_transport, m) {
 	 const std::string &, 
 	 const std::string &,
 	 uint32_t>())
-    
+
+    .def_readwrite("sendCompletionQueue", &RdmaTransport::sendCompletionQueue)
+    .def_readwrite("receiveCompletionQueue", &RdmaTransport::receiveCompletionQueue)
     .def_readwrite("numCompletionsFound", &RdmaTransport::numCompletionsFound)
     .def("pollRequests", &RdmaTransport::pollRequests)
     .def("issueRequests", &RdmaTransport::issueRequests)
