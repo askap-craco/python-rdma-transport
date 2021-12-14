@@ -62,7 +62,7 @@ struct RdmaTransport {
   struct ibv_send_wr *badSendRequest = NULL;
   struct timeval metricStartWallTime;
 
-  //int numCompletionsFound;
+  int numCompletionsFound;
   
   RdmaTransport(enum logType _requestLogLevel,
 		enum runMode _mode,
@@ -527,11 +527,11 @@ struct RdmaTransport {
       }
   }
 
-  int pollRequests()
+  void pollRequests()
   {
-    int numCompletionsFound = 0;
     if (mode == RECV_MODE)
       {
+	numCompletionsFound = 0;
 	memset(workCompletions, 0, sizeof(struct ibv_wc) * maxWorkRequestDequeue);
         numCompletionsFound = ibv_poll_cq(receiveCompletionQueue, maxWorkRequestDequeue, workCompletions);
       }
@@ -539,11 +539,10 @@ struct RdmaTransport {
       {	
         /* poll the completion queue for work completions */
         /* NOTE perftest demo does not poll for number of workCompletions on sender */
+	numCompletionsFound = 0;
         memset(workCompletions, 0, sizeof(struct ibv_wc) * maxWorkRequestDequeue);
         numCompletionsFound = ibv_poll_cq(sendCompletionQueue, maxWorkRequestDequeue, workCompletions);
       }
-
-    return numCompletionsFound;
   }
   
   virtual ~RdmaTransport()
@@ -637,10 +636,7 @@ PYBIND11_MODULE(rdma_transport, m) {
 	 const std::string &,
 	 uint32_t>())
     
-    //cls.def_readonly_static("numCompletionsFound", &RdmaTransport::numCompletionsFound)
-    
-    //.def("numCompletionsFound", &RdmaTransport::numCompletionsFound)
-    //.def("foo", &A::foo)
+    .def_readwrite("numCompletionsFound", &RdmaTransport::numCompletionsFound)
     .def("pollRequests", &RdmaTransport::pollRequests)
     .def("issueRequests", &RdmaTransport::issueRequests)
     .def("waitRequestsCompletion", &RdmaTransport::waitRequestsCompletion)
