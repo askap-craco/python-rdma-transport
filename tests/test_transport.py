@@ -1,6 +1,7 @@
 from rdma_transport import RdmaTransport
 from rdma_transport import runMode
 from rdma_transport import logType
+from rdma_transport import ibv_cq
 
 def test_hello():
     # From the C sources aboutmaxIlinedadtaSize
@@ -36,6 +37,12 @@ def test_hello():
                       metricURL,
                       numMetricAveraging)
 
+    t.issueRequests()
+
+    t.waitRequestsCompltion()
+
+    t.pollRequests()
+    
     t.say_hello()
 
     a = 2
@@ -45,5 +52,3 @@ def test_hello():
     
     assert c == (a+b)
     print(f"We get c = {c} with addition of {a} and {b}")
-    
-    t.sendRecvive()

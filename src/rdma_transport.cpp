@@ -642,9 +642,10 @@ PYBIND11_MODULE(rdma_transport, m) {
     .def_readwrite("sendCompletionQueue", &RdmaTransport::sendCompletionQueue)
     .def_readwrite("receiveCompletionQueue", &RdmaTransport::receiveCompletionQueue)
     .def_readwrite("numCompletionsFound", &RdmaTransport::numCompletionsFound)
+
     .def("pollRequests", &RdmaTransport::pollRequests)
-    .def("issueRequests", &RdmaTransport::issueRequests)
     .def("waitRequestsCompletion", &RdmaTransport::waitRequestsCompletion)
+    .def("issueRequests", &RdmaTransport::issueRequests)
     .def("say_hello", &RdmaTransport::say_hello)
     .def("addition", &RdmaTransport::addition);
 
