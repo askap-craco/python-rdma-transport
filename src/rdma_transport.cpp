@@ -62,7 +62,7 @@ struct RdmaTransport {
   struct ibv_send_wr *badSendRequest = NULL;
   struct timeval metricStartWallTime;
 
-  int numCompletionsFound;
+  //int numCompletionsFound;
   
   RdmaTransport(enum logType _requestLogLevel,
 		enum runMode _mode,
@@ -527,11 +527,11 @@ struct RdmaTransport {
       }
   }
 
-  void pollRequests()
+  int pollRequests()
   {
+    int numCompletionsFound = 0;
     if (mode == RECV_MODE)
       {
-	numCompletionsFound = 0;
 	memset(workCompletions, 0, sizeof(struct ibv_wc) * maxWorkRequestDequeue);
         numCompletionsFound = ibv_poll_cq(receiveCompletionQueue, maxWorkRequestDequeue, workCompletions);
       }
@@ -539,10 +539,11 @@ struct RdmaTransport {
       {	
         /* poll the completion queue for work completions */
         /* NOTE perftest demo does not poll for number of workCompletions on sender */
-	numCompletionsFound = 0;
         memset(workCompletions, 0, sizeof(struct ibv_wc) * maxWorkRequestDequeue);
         numCompletionsFound = ibv_poll_cq(sendCompletionQueue, maxWorkRequestDequeue, workCompletions);
       }
+
+    return numCompletionsFound;
   }
   
   virtual ~RdmaTransport()
@@ -567,7 +568,6 @@ struct RdmaTransport {
       }
     
     free(workCompletions);
-    free(completionsStatus);
 
     deregisterMemoryRegions(manager);
 
@@ -596,7 +596,7 @@ PYBIND11_MODULE(rdma_transport, m) {
     RDMA transport pluggin
         -----------------------
 
-        .. currentmodule:: CRACO
+        .. currentmodulex:: CRACO
 
         .. autosummary::
            :toctree: _generate
@@ -619,7 +619,8 @@ PYBIND11_MODULE(rdma_transport, m) {
     .value("LOG_INFO",    logType{LOG_INFO})
     .value("LOG_DEBUG",   logType{LOG_DEBUG})
     .export_values();
-    
+
+  
   py::class_<RdmaTransport>(m, "RdmaTransport")
     .def(py::init<enum logType,
 	 enum runMode,
@@ -635,12 +636,23 @@ PYBIND11_MODULE(rdma_transport, m) {
 	 const std::string &, 
 	 const std::string &,
 	 uint32_t>())
-
+    
+    //cls.def_readonly_static("numCompletionsFound", &RdmaTransport::numCompletionsFound)
+    
+    //.def("numCompletionsFound", &RdmaTransport::numCompletionsFound)
+    //.def("foo", &A::foo)
     .def("pollRequests", &RdmaTransport::pollRequests)
     .def("issueRequests", &RdmaTransport::issueRequests)
     .def("waitRequestsCompletion", &RdmaTransport::waitRequestsCompletion)
     .def("say_hello", &RdmaTransport::say_hello)
     .def("addition", &RdmaTransport::addition);
+
+  // To create a buffer
+  // https://pybind11.readthedocs.io/en/stable/advanced/pycpp/numpy.html
+  // expections
+  // https://blog.ekbana.com/write-a-python-binding-for-your-c-code-using-pybind11-library-ef0992d4b68
+  
+  //cls.def_property_readonly("numCompletionsFound", [](py::object) { return RdmaTransport::numCompletionsFound; });
   
 #ifdef VERSION_INFO
   m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);
