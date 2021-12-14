@@ -2,6 +2,7 @@ from rdma_transport import RdmaTransport
 from rdma_transport import runMode
 from rdma_transport import logType
 from rdma_transport import ibv_cq
+from rdma_transport import RdmaException
 
 def test_hello():
     # From the C sources aboutmaxIlinedadtaSize
