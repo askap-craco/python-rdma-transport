@@ -49,7 +49,7 @@ struct RdmaTransport {
   /* setup for loop enqueueing blocks of work requests and polling for blocks of work completions */
   uint32_t minWorkRequestEnqueue;
   uint32_t maxWorkRequestDequeue;
-  struct ibv_wc *workCompletions = NULL;
+  
   uint32_t currentQueueLoading = 0; /* no work requests initially in queue */
   uint64_t numWorkRequestsEnqueued = 0;
   uint32_t previousImmediateData;
@@ -67,7 +67,9 @@ struct RdmaTransport {
   struct ibv_send_wr *badSendRequest = NULL;
   struct timeval metricStartWallTime;
 
+  /* These two will be accessed outside*/
   int numCompletionsFound;
+  std::vector<struct ibv_wc> workCompletions; // resize it in contructor
   
   RdmaTransport(enum logType _requestLogLevel,
 		enum runMode _mode,
@@ -198,6 +200,7 @@ struct RdmaTransport {
         //logger(LOG_CRIT, "Unable to allocate the RDMA resources");
 	fprintf(stderr, "ERR:\tUnable to allocate the RDMA resources\n");
         exit(FAILURE);
+	//throw RdmaException("ERR:\tUnable to allocate the RDMA resources");
       }
     else
       //logger(LOG_DEBUG, "RDMA resources allocated");
@@ -392,13 +395,14 @@ struct RdmaTransport {
     /* setup for loop enqueueing blocks of work requests and polling for blocks of work completions */
     minWorkRequestEnqueue = (uint32_t) ceil(queueCapacity * MIN_WORK_REQUEST_ENQUEUE);
     maxWorkRequestDequeue = queueCapacity; /* try to completely drain queue of any completed work requests */
-    workCompletions = (struct ibv_wc*)malloc(sizeof(struct ibv_wc) * maxWorkRequestDequeue);
-    if (workCompletions == NULL)
-      {
-	//logger(LOG_ERR, "Receiver unable to allocate desired memory for work completions");
-	fprintf(stderr, "ERR:\tReceiver unable to allocate desired memory for work completions\n");
-	exit(FAILURE);
-      }
+    //workCompletions.resize(maxWorkRequestDequeue);
+    
+    //if (workCompletions == NULL)
+    //  {
+    //	//logger(LOG_ERR, "Receiver unable to allocate desired memory for work completions");
+    //	fprintf(stderr, "ERR:\tReceiver unable to allocate desired memory for work completions\n");
+    //	exit(FAILURE);
+    //  }
 
     setAllMemoryRegionsEnqueued(manager, false); 
     if ((char*)metricURL.c_str() != NULL)
@@ -445,7 +449,7 @@ struct RdmaTransport {
             else
 	      {
                 //logger(LOG_INFO, "Receiver has posted work requests for region %" PRIu32, regionIndex);
-		fprintf(stdout, "INFO:\tReceiver has posted work requests for region %\n" PRIu32, regionIndex);
+		fprintf(stdout, "INFO:\tReceiver has posted work requests for region %" PRIu32"\n", regionIndex);
                 /* check that the memory region isn't already populated with data */
                 if (manager->isMonitoringRegions && getMemoryRegionPopulated(manager, regionIndex))
 		  {
@@ -453,7 +457,7 @@ struct RdmaTransport {
 		    //	   " but already populated while enqueueing work request %" PRIu64,
 		    //	   regionIndex, numWorkRequestsEnqueued + numWorkRequestsMissing);
 		    fprintf(stdout, "WARN:\tMemory region %" PRIu32 " has been enqueued for receiving"
-			    " but already populated while enqueueing work request %\n" PRIu64,
+			    " but already populated while enqueueing work request %" PRIu64"\n",
 			    regionIndex, numWorkRequestsEnqueued + numWorkRequestsMissing);
 		  }
                 currentQueueLoading += manager->numContiguousMessages;
@@ -484,7 +488,7 @@ struct RdmaTransport {
             else
 	      {
                 //logger(LOG_INFO, "Sender has posted work requests for region %" PRIu32, regionIndex);
-		fprintf(stdout, "INFO:\tSender has posted work requests for region %\n" PRIu32, regionIndex);
+		fprintf(stdout, "INFO:\tSender has posted work requests for region %" PRIu32"\n", regionIndex);
                 /* check that the memory region is already populated with data */
                 if (manager->isMonitoringRegions && !getMemoryRegionPopulated(manager, regionIndex))
 		  {
@@ -492,7 +496,7 @@ struct RdmaTransport {
 		    //	   " without first being populated while enqueing work request %" PRIu64,
 		    //	   regionIndex, numWorkRequestsEnqueued);
                     fprintf(stdout, "WARN:\tMemory region %" PRIu32 " has been enqueued for sending"
-			    " without first being populated while enqueing work request %\n" PRIu64,
+			    " without first being populated while enqueing work request %" PRIu64"\n",
 			    regionIndex, numWorkRequestsEnqueued);
 		  }
                 currentQueueLoading += manager->numContiguousMessages;
@@ -549,7 +553,7 @@ struct RdmaTransport {
         /* poll for block of work completions */
         //logger(LOG_INFO, "Receiver waiting for completion %" PRIu64 " of %" PRIu64,
 	//       numWorkRequestCompletions + numWorkRequestsMissing, manager->numTotalMessages);
-        fprintf(stdout, "INFO:\tReceiver waiting for completion %" PRIu64 " of %\n" PRIu64,
+        fprintf(stdout, "INFO:\tReceiver waiting for completion %" PRIu64 " of %" PRIu64"\n",
 		numWorkRequestCompletions + numWorkRequestsMissing, manager->numTotalMessages);
         if (waitForCompletionQueueEvent() != SUCCESS)
 	  {
@@ -560,7 +564,7 @@ struct RdmaTransport {
     else
       {
         //logger(LOG_INFO, "Sender waiting for completion %" PRIu64 " of %" PRIu64, numWorkRequestCompletions, manager->numTotalMessages);
-	fprintf(stdout, "INFO:\tSender waiting for completion %" PRIu64 " of %\n" PRIu64, numWorkRequestCompletions, manager->numTotalMessages);
+	fprintf(stdout, "INFO:\tSender waiting for completion %" PRIu64 " of %" PRIu64"\n", numWorkRequestCompletions, manager->numTotalMessages);
         if (waitForCompletionQueueEvent() != SUCCESS)
 	  {
             //logger(LOG_ERR, "Sender unable to wait for completion notification");
@@ -571,19 +575,22 @@ struct RdmaTransport {
 
   void pollRequests()
   {
+    numCompletionsFound = 0;
+    workCompletions.resize(maxWorkRequestDequeue);
+    std::fill(workCompletions.begin(), workCompletions.end(), ibv_wc{0});
+    
     if (mode == RECV_MODE)
       {
-	numCompletionsFound = 0;
-	memset(workCompletions, 0, sizeof(struct ibv_wc) * maxWorkRequestDequeue);
-        numCompletionsFound = ibv_poll_cq(receiveCompletionQueue, maxWorkRequestDequeue, workCompletions);
+	// Change here for vector
+	numCompletionsFound = ibv_poll_cq(receiveCompletionQueue, maxWorkRequestDequeue, workCompletions.data());
+	workCompletions.resize(numCompletionsFound);
+	// setup workCompletions size here
       }
     else
       {	
-        /* poll the completion queue for work completions */
-        /* NOTE perftest demo does not poll for number of workCompletions on sender */
-	numCompletionsFound = 0;
-        memset(workCompletions, 0, sizeof(struct ibv_wc) * maxWorkRequestDequeue);
-        numCompletionsFound = ibv_poll_cq(sendCompletionQueue, maxWorkRequestDequeue, workCompletions);
+	// change for vector
+	numCompletionsFound = ibv_poll_cq(sendCompletionQueue, maxWorkRequestDequeue, workCompletions.data());
+	workCompletions.resize(numCompletionsFound);
       }
   }
   
@@ -608,8 +615,6 @@ struct RdmaTransport {
       {
         cleanupMetricReporter();
       }
-    
-    free(workCompletions);
 
     deregisterMemoryRegions(manager);
 
@@ -664,8 +669,22 @@ PYBIND11_MODULE(rdma_transport, m) {
     .export_values();
 
 
-  // expose ibv_cq struct to python
-  py::class_<ibv_cq>(m, "ibv_cq");
+  // expose ibv_wc struct to python
+  py::class_<ibv_wc>(m, "ibv_wc")
+    .def_readonly("wr_id",          &ibv_wc::wr_id)
+    .def_readonly("status",         &ibv_wc::status)
+    .def_readonly("opcode",         &ibv_wc::opcode)
+    .def_readonly("vendor_err",     &ibv_wc::vendor_err)
+    .def_readonly("byte_len",       &ibv_wc::byte_len)
+    .def_readonly("imm_data",       &ibv_wc::imm_data)
+    .def_readonly("qp_num",         &ibv_wc::qp_num)
+    .def_readonly("src_qp",         &ibv_wc::src_qp)
+    .def_readonly("wc_flags",       &ibv_wc::wc_flags)
+    .def_readonly("pkey_index",     &ibv_wc::pkey_index)
+    .def_readonly("slid",           &ibv_wc::slid)
+    .def_readonly("sl",             &ibv_wc::sl)
+    .def_readonly("dlid_path_bits", &ibv_wc::dlid_path_bits);
+    
   
   py::class_<RdmaTransport>(m, "RdmaTransport")
     .def(py::init<enum logType,
@@ -683,9 +702,10 @@ PYBIND11_MODULE(rdma_transport, m) {
 	 const std::string &,
 	 uint32_t>())
 
-    .def_readwrite("sendCompletionQueue", &RdmaTransport::sendCompletionQueue)
-    .def_readwrite("receiveCompletionQueue", &RdmaTransport::receiveCompletionQueue)
-    .def_readwrite("numCompletionsFound", &RdmaTransport::numCompletionsFound)
+    .def_readonly("workCompletions", &RdmaTransport::workCompletions)
+    .def_readonly("numCompletionsFound", &RdmaTransport::numCompletionsFound)
+    //.def_readwrite("sendCompletionQueue", &RdmaTransport::sendCompletionQueue)
+    //.def_readwrite("receiveCompletionQueue", &RdmaTransport::receiveCompletionQueue)
 
     .def("pollRequests", &RdmaTransport::pollRequests)
     .def("waitRequestsCompletion", &RdmaTransport::waitRequestsCompletion)

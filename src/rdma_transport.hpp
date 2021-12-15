@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include <stdexcept>
+#include <algorithm>
 
 #define STRINGIFY(x) #x
 #define MACRO_STRINGIFY(x) STRINGIFY(x)
