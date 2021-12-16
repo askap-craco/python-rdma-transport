@@ -14,9 +14,10 @@ def test_hello():
     dataFileName = None
     numTotalMessages = 0
     messageDelayTime = 0
-    rdmaDeviceName = "mlx5_1"
+    rdmaDeviceName = None #"mlx5_1"
     rdmaPort = 1
     gidIndex = -1
+    #identifierFileName = None 
     identifierFileName = "exchange"
     metricURL = None
     numMetricAveraging = 0
