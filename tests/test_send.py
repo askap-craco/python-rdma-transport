@@ -17,7 +17,7 @@ def test_hello():
     rdmaDeviceName = "mlx5_1"
     rdmaPort = 1
     gidIndex = -1
-    identifierFileName = None
+    identifierFileName = "exchange"
     metricURL = None
     numMetricAveraging = 0
   

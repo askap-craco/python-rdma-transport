@@ -254,7 +254,7 @@ struct RdmaTransport {
     // Force it to nullptr
     // we need to fix the function so that exchangefilename can be nulptr
     //identifierExchangeFunction = nullptr;
-    assert(identifierExchangeFunction == nullptr);
+    //assert(identifierExchangeFunction == nullptr);
     
     if (identifierExchangeFunction == nullptr)
       {
@@ -315,28 +315,33 @@ struct RdmaTransport {
       }
     
     /* perform the rdma data transfer */
-    if (ibv_req_notify_cq(receiveCompletionQueue, 0) != SUCCESS)
+    if (mode == RECV_MODE)
       {
-        //logger(LOG_ERR, "Unable to request receive completion queue notifications");
-        //if (mode == RECV_MODE)
-	//  exit(FAILURE);
-	
-	fprintf(stderr, "ERR:\tUnable to request receive completion queue notifications\n");
-	throw std::runtime_error("ERR:\tUnable to request receive completion queue notifications\n");
+	if (ibv_req_notify_cq(receiveCompletionQueue, 0) != SUCCESS)
+	  {
+	    //logger(LOG_ERR, "Unable to request receive completion queue notifications");
+	    //if (mode == RECV_MODE)
+	    //  exit(FAILURE);
+	    
+	    fprintf(stderr, "ERR:\tUnable to request receive completion queue notifications\n");
+	    throw std::runtime_error("ERR:\tUnable to request receive completion queue notifications\n");
+	  }
+	else
+	  {
+	    fprintf(stdout, "DEBUG:\tCompletion queue sent for receive\n");
+	  }
       }
     else
       {
-	fprintf(stdout, "DEBUG:\tCompletion queue sent for receive\n");
-      }
-    
-    if (ibv_req_notify_cq(sendCompletionQueue, 0) != SUCCESS)
-      {
-        //logger(LOG_WARNING, "Unable to request send completion queue notifications");
-	fprintf(stdout, "WARN:\tUnable to request send completion queue notifications\n");
-      }
-    else
-      {
-	fprintf(stdout, "DEBUG:\tCompletion queue sent for send\n");
+	if (ibv_req_notify_cq(sendCompletionQueue, 0) != SUCCESS)
+	  {
+	    //logger(LOG_WARNING, "Unable to request send completion queue notifications");
+	    fprintf(stdout, "WARN:\tUnable to request send completion queue notifications\n");
+	  }
+	else
+	  {
+	    fprintf(stdout, "DEBUG:\tCompletion queue sent for send\n");
+	  }
       }
 
     /* now create work requests*/
@@ -657,32 +662,22 @@ struct RdmaTransport {
 	//       numWorkRequestCompletions + numWorkRequestsMissing, manager->numTotalMessages);
         fprintf(stdout, "INFO:\tReceiver waiting for completion %" PRIu64 " of %" PRIu64"\n",
 		numWorkRequestCompletions + numWorkRequestsMissing, manager->numTotalMessages);
-        if (waitForCompletionQueueEvent() != SUCCESS)
-	  {
-            //logger(LOG_ERR, "Receiver unable to wait for completion notification");
-	    fprintf(stderr, "ERR:\tReceiver unable to wait for completion notification\n");
-	    throw std::runtime_error("ERR:\tReceiver unable to wait for completion notification\n");
-	  }
-	else
-	  {
-	    fprintf(stdout, "DEBUG:\twait for completions done\n");
-	  }
       }
     else
       {
         //logger(LOG_INFO, "Sender waiting for completion %" PRIu64 " of %" PRIu64, numWorkRequestCompletions, manager->numTotalMessages);
 	fprintf(stdout, "INFO:\tSender waiting for completion %" PRIu64 " of %" PRIu64"\n", numWorkRequestCompletions, manager->numTotalMessages);
-        if (waitForCompletionQueueEvent() != SUCCESS)
-	  {
-            //logger(LOG_ERR, "Sender unable to wait for completion notification");
-	    fprintf(stderr, "ERR:\tSender unable to wait for completion notification\n");
-	    throw std::runtime_error("ERR:\tSender unable to wait for completion notification\n");
-	  }
-	
-	else
-	  {
-	    fprintf(stdout, "DEBUG:\twait for completions done\n");
-	  }
+      }
+    
+    if (waitForCompletionQueueEvent() != SUCCESS)
+      {
+	//logger(LOG_ERR, "Receiver unable to wait for completion notification");
+	fprintf(stderr, "ERR:\tunable to wait for completion notification\n");
+	throw std::runtime_error("ERR:\tunable to wait for completion notification\n");
+      }
+    else
+      {
+	fprintf(stdout, "DEBUG:\twait for completions done\n");
       }
   }
   
