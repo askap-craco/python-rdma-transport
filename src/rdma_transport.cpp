@@ -63,8 +63,8 @@ struct RdmaTransport {
   uint64_t metricWorkRequestsMissing = 0;
   
   /* initialise sender metrics */
-  struct ibv_recv_wr *badReceiveRequest = NULL;
-  struct ibv_send_wr *badSendRequest = NULL;
+  struct ibv_recv_wr *badReceiveRequest = nullptr;
+  struct ibv_send_wr *badSendRequest = nullptr;
   struct timeval metricStartWallTime;
 
   /* These two will be accessed outside*/
@@ -168,6 +168,7 @@ struct RdmaTransport {
     enum exchangeResult (*identifierExchangeFunction)(bool isSendMode,
 						      uint32_t packetSequenceNumber, uint32_t queuePairNumber, union ibv_gid gidAddress, uint16_t localIdentifier,
 						      uint32_t *remotePSNPtr, uint32_t *remoteQPNPtr, union ibv_gid *remoteGIDPtr, uint16_t *remoteLIDPtr) = nullptr;
+
     if ((char*)identifierFileName.c_str() != nullptr)
       {
         setIdentifierFileName((char*)identifierFileName.c_str());
@@ -237,6 +238,24 @@ struct RdmaTransport {
     uint32_t remoteQPN;
     union ibv_gid remoteGID;
     uint16_t remoteLID;
+
+    //// for some reason identifierExchangeFunction is not nullptr 
+    //if (exchangeViaStdIO(mode==SEND_MODE,
+    //			 packetSequenceNumber, queuePairNumber, gidAddress, localIdentifier,
+    //			 &remotePSN, &remoteQPN, &remoteGID, &remoteLID) != EXCH_SUCCESS)
+    //  {
+    //	//logger(LOG_CRIT, "Unable to exchange identifiers via standard IO");
+    //	//exit(FAILURE);
+    //	
+    //	fprintf(stderr, "ERR:\tUnable to exchange identifiers via standard IO\n");
+    //	throw std::runtime_error("ERR:\tUnable to exchange identifiers via standard IO");
+    //  }
+
+    // Force it to nullptr
+    // we need to fix the function so that exchangefilename can be nulptr
+    identifierExchangeFunction = nullptr;
+    assert(identifierExchangeFunction == nullptr);
+    
     if (identifierExchangeFunction == nullptr)
       {
         if (exchangeViaStdIO(mode==SEND_MODE,
@@ -252,6 +271,7 @@ struct RdmaTransport {
       }
     else
       {
+	//fprintf(stdout, "I am here???\n");
         if (identifierExchangeFunction(mode==SEND_MODE,
 				       packetSequenceNumber, queuePairNumber, gidAddress, localIdentifier,
 				       &remotePSN, &remoteQPN, &remoteGID, &remoteLID) != EXCH_SUCCESS)
@@ -263,6 +283,8 @@ struct RdmaTransport {
 	  }
 
       }
+    
+    //fprintf(stdout, "I am here???\n");
 
     /* modify the queue pair to be ready to receive and possibly send */
     if (modifyQueuePairReady(queuePair, rdmaPort, gidIndex, mode, packetSequenceNumber,
@@ -345,7 +367,7 @@ struct RdmaTransport {
 		receiveRequests[regionIndex][i].num_sge = sgListLength;
 		if (i == manager->numContiguousMessages-1)
 		  {
-		    receiveRequests[regionIndex][i].next = NULL; /* note can chain multiple workRequest together for performance */
+		    receiveRequests[regionIndex][i].next = nullptr; /* note can chain multiple workRequest together for performance */
 		  }
 		else
 		  {
@@ -390,7 +412,7 @@ struct RdmaTransport {
 		sendRequests[regionIndex][i].imm_data = (uint32_t)0; /* set appropriately prior to each ibv_post_send */
 		if (i == manager->numContiguousMessages-1)
 		  {
-		    sendRequests[regionIndex][i].next = NULL; /* note can chain multiple workRequest together for performance */
+		    sendRequests[regionIndex][i].next = nullptr; /* note can chain multiple workRequest together for performance */
 		    sendRequests[regionIndex][i].send_flags = 0; // IBV_SEND_SIGNALED; /* include signal with last work request */
 		  }
 		else
@@ -409,7 +431,7 @@ struct RdmaTransport {
     maxWorkRequestDequeue = queueCapacity; /* try to completely drain queue of any completed work requests */
     //workCompletions.resize(maxWorkRequestDequeue);
     
-    //if (workCompletions == NULL)
+    //if (workCompletions == nullptr)
     //  {
     //	//logger(LOG_ERR, "Receiver unable to allocate desired memory for work completions");
     //	fprintf(stderr, "ERR:\tReceiver unable to allocate desired memory for work completions\n");
@@ -417,7 +439,7 @@ struct RdmaTransport {
     //  }
 
     setAllMemoryRegionsEnqueued(manager, false); 
-    if ((char*)metricURL.c_str() != NULL)
+    if ((char*)metricURL.c_str() != nullptr)
       {
 	initialiseMetricReporter();
       }
@@ -440,7 +462,7 @@ struct RdmaTransport {
   
     /* initialise sender metrics */
     metricStartClockTime = clock();
-    gettimeofday(&metricStartWallTime, NULL);
+    gettimeofday(&metricStartWallTime, nullptr);
   }
 
   /*
@@ -639,7 +661,7 @@ struct RdmaTransport {
         displayMemoryBlocks(manager, 10, 10); /* display contents that were received */
       }
 
-    if ((char *)metricURL.c_str() != NULL)
+    if ((char *)metricURL.c_str() != nullptr)
       {
         cleanupMetricReporter();
       }

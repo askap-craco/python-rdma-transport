@@ -7,7 +7,7 @@ def test_hello():
     # From the C sources aboutmaxIlinedadtaSize
     # must be zero NOTE put back at 236 once testing completed
     requestLogLevel = logType.LOG_NOTICE
-    mode = runMode.RECV_MODE
+    mode = runMode.SEND_MODE
     messageSize = 65536
     numMemoryBlocks = 1
     numContiguousMessages = 1
