@@ -21,14 +21,14 @@ struct RdmaTransport {
   uint32_t messageSize = 65536; /* size in bytes of single RDMA message */
   uint32_t numMemoryBlocks = 1; /* number of memory blocks to allocate for RDMA messages */
   uint32_t numContiguousMessages = 1; /* number of contiguous messages to hold in each memory block */
-  std::string dataFileName = nullptr; /* default to not loading (sender) nor saving (receiver) to file the data memory blocks */
+  char* dataFileName = nullptr; /* default to not loading (sender) nor saving (receiver) to file the data memory blocks */
   uint64_t numTotalMessages = 0; /* total number of messages to send or receive, if 0 then default to numMemoryBlocks*numContiguousMessages */
   uint32_t messageDelayTime = 0; /* time in milliseconds to delay after each message send/receive posted, default is no delay */
-  std::string rdmaDeviceName = nullptr; /* no preferred rdma device name to choose */
+  char* rdmaDeviceName = nullptr; /* no preferred rdma device name to choose */
   uint8_t rdmaPort = 1;
   int gidIndex = -1; /* preferred gid index or -1 for no preference */
-  std::string identifierFileName = nullptr; /* default to using stdio for exchanging RDMA identifiers */
-  std::string metricURL = nullptr; /* default to not push metrics */
+  char* identifierFileName = nullptr; /* default to using stdio for exchanging RDMA identifiers */
+  char* metricURL = nullptr; /* default to not push metrics */
   uint32_t numMetricAveraging = 0; /* number of message completions over which to average metrics, default to numMemoryBlocks*numContiguousMessages */
 
   /* setup when class instance is created */
@@ -76,14 +76,14 @@ struct RdmaTransport {
 		uint32_t _messageSize,
 		uint32_t _numMemoryBlocks,
 		uint32_t _numContiguousMessages,
-		const std::string &_dataFileName,
+		char*_dataFileName,
 		uint64_t _numTotalMessages,
 		uint32_t _messageDelayTime,
-		const std::string &_rdmaDeviceName,
+		char* _rdmaDeviceName,
 		uint8_t _rdmaPort,
 		int _gidIndex,
-		const std::string &_identifierFileName,
-		const std::string &_metricURL,
+		char* _identifierFileName,
+		char* _metricURL,
 		uint32_t _numMetricAveraging) :
     requestLogLevel(_requestLogLevel),
     mode(_mode),
@@ -139,10 +139,10 @@ struct RdmaTransport {
       }
     else
       {
-        if ((char*)dataFileName.c_str() != nullptr)
+        if (dataFileName != nullptr)
 	  {
             // read data from dataFileName.0, dataFileName.1, ... into memory blocks
-            if (!readFilesIntoMemoryBlocks(manager, (char*)dataFileName.c_str()))
+            if (!readFilesIntoMemoryBlocks(manager, dataFileName))
 	      {
                 //logger(LOG_WARNING, "Unsuccessful read of data files");
 		fprintf(stdout, "WARN:\tUnsuccessful read of data files\n");
@@ -169,9 +169,9 @@ struct RdmaTransport {
 						      uint32_t packetSequenceNumber, uint32_t queuePairNumber, union ibv_gid gidAddress, uint16_t localIdentifier,
 						      uint32_t *remotePSNPtr, uint32_t *remoteQPNPtr, union ibv_gid *remoteGIDPtr, uint16_t *remoteLIDPtr) = nullptr;
 
-    if ((char*)identifierFileName.c_str() != nullptr)
+    if (identifierFileName != nullptr)
       {
-        setIdentifierFileName((char*)identifierFileName.c_str());
+        setIdentifierFileName(identifierFileName);
         identifierExchangeFunction = exchangeViaSharedFiles;
       }
     if (numMetricAveraging == 0)
@@ -194,7 +194,7 @@ struct RdmaTransport {
     queueCapacity = manager->numContiguousMessages * manager->numMemoryRegions ; /* minimum capacity for completion queues */
     maxInlineDataSize = 0; /* NOTE put back at 236 once testing completed */;
 
-    if (allocateRDMAResources((char*)rdmaDeviceName.c_str(), rdmaPort, queueCapacity, maxInlineDataSize,
+    if (allocateRDMAResources(rdmaDeviceName, rdmaPort, queueCapacity, maxInlineDataSize,
 			      &rdmaDeviceContext, &eventChannel, &protectionDomain, &receiveCompletionQueue,
 			      &sendCompletionQueue, &queuePair) != SUCCESS)
       {
@@ -253,7 +253,7 @@ struct RdmaTransport {
 
     // Force it to nullptr
     // we need to fix the function so that exchangefilename can be nulptr
-    identifierExchangeFunction = nullptr;
+    //identifierExchangeFunction = nullptr;
     assert(identifierExchangeFunction == nullptr);
     
     if (identifierExchangeFunction == nullptr)
@@ -439,7 +439,7 @@ struct RdmaTransport {
     //  }
 
     setAllMemoryRegionsEnqueued(manager, false); 
-    if ((char*)metricURL.c_str() != nullptr)
+    if (metricURL != nullptr)
       {
 	initialiseMetricReporter();
       }
@@ -649,10 +649,10 @@ struct RdmaTransport {
     /* if in receive mode then display contents to stdio */
     if (mode == RECV_MODE)
       {
-        if ((char *)dataFileName.c_str() != nullptr)
+        if ((char *)dataFileName != nullptr)
     	  {
             // write data to dataFileName.0, dataFileName.1, ... from memory blocks
-            if (!writeFilesFromMemoryBlocks(manager, (char*)dataFileName.c_str()))
+            if (!writeFilesFromMemoryBlocks(manager, dataFileName))
     	      {
                 //logger(LOG_WARNING, "Unsuccessful write of data files");
 		fprintf(stdout, "WARN:\tUnsuccessful write of data files\n");
@@ -661,7 +661,7 @@ struct RdmaTransport {
         displayMemoryBlocks(manager, 10, 10); /* display contents that were received */
       }
 
-    if ((char *)metricURL.c_str() != nullptr)
+    if ((char *)metricURL != nullptr)
       {
         cleanupMetricReporter();
       }
@@ -742,14 +742,14 @@ PYBIND11_MODULE(rdma_transport, m) {
 	 uint32_t, 
 	 uint32_t, 
 	 uint32_t, 
-	 const std::string &, 
+	 char*, 
 	 uint64_t, 
 	 uint32_t, 
-	 const std::string &, 
+	 char*,
 	 uint8_t, 
 	 int, 
-	 const std::string &, 
-	 const std::string &,
+	 char*,
+	 char*,
 	 uint32_t>())
 
     //.def_readonly("workCompletions", &RdmaTransport::workCompletions)

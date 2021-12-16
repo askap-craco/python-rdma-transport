@@ -11,14 +11,14 @@ def test_hello():
     messageSize = 65536
     numMemoryBlocks = 1
     numContiguousMessages = 1
-    dataFileName = ""
+    dataFileName = None
     numTotalMessages = 0
     messageDelayTime = 0
     rdmaDeviceName = "mlx5_1"
     rdmaPort = 1
     gidIndex = -1
-    identifierFileName = " "
-    metricURL = " "
+    identifierFileName = None
+    metricURL = None
     numMetricAveraging = 0
   
     rdma_transport = RdmaTransport(requestLogLevel, 
