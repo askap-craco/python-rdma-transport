@@ -6,9 +6,9 @@ extern "C" {
 }
 
 
-// How to print on terminal
-// How to get c++ exception with python
-// How to understand c++ struct with python
+// How to print on terminal, okay
+// How to get c++ exception with python, done
+// How to understand c++ struct with python, done
 
 struct RdmaTransport {
   
@@ -198,9 +198,10 @@ struct RdmaTransport {
 			      &sendCompletionQueue, &queuePair) != SUCCESS)
       {
         //logger(LOG_CRIT, "Unable to allocate the RDMA resources");
+	//exit(FAILURE);
+
 	fprintf(stderr, "ERR:\tUnable to allocate the RDMA resources\n");
-        exit(FAILURE);
-	//throw RdmaException("ERR:\tUnable to allocate the RDMA resources");
+	throw std::runtime_error( "ERR:\tUnable to allocate the RDMA resources");
       }
     else
       //logger(LOG_DEBUG, "RDMA resources allocated");
@@ -214,8 +215,10 @@ struct RdmaTransport {
 			    &gidAddress, &gidIndex, &mtu) != SUCCESS)
       {
         //logger(LOG_CRIT, "Unable to set up the RDMA connection");
+	//exit(FAILURE);
+	
 	fprintf(stderr, "ERR:\tUnable to set up the RDMA connection\n");
-        exit(FAILURE);
+	throw std::runtime_error( "ERR:\tUnable to set up the RDMA connection");
       }
     else
       //logger(LOG_DEBUG, "RDMA connection set up");
@@ -241,8 +244,10 @@ struct RdmaTransport {
 			     &remotePSN, &remoteQPN, &remoteGID, &remoteLID) != EXCH_SUCCESS)
 	  {
             //logger(LOG_CRIT, "Unable to exchange identifiers via standard IO");
+	    //exit(FAILURE);
+	    
 	    fprintf(stderr, "ERR:\tUnable to exchange identifiers via standard IO\n");
-            exit(FAILURE);
+	    throw std::runtime_error("ERR:\tUnable to exchange identifiers via standard IO");
 	  }
       }
     else
@@ -252,8 +257,9 @@ struct RdmaTransport {
 				       &remotePSN, &remoteQPN, &remoteGID, &remoteLID) != EXCH_SUCCESS)
 	  {
             //logger(LOG_CRIT, "Unable to exchange identifiers via provided exchange function");
+	    //exit(FAILURE);
 	    fprintf(stderr, "ERR:\tUnable to exchange identifiers via provided exchange function\n");
-            exit(FAILURE);
+	    throw std::runtime_error("ERR:\tUnable to exchange identifiers via provided exchange function\n");
 	  }
 
       }
@@ -263,8 +269,10 @@ struct RdmaTransport {
 			     remotePSN, remoteQPN, remoteGID, remoteLID, mtu) != SUCCESS)
       {
         //logger(LOG_CRIT, "Unable to modify queue pair to be ready");
+	//exit(FAILURE);
+	
 	fprintf(stderr, "ERR:\tUnable to modify queue pair to be ready\n");
-        exit(FAILURE);
+	throw std::runtime_error("ERR:\tUnable to modify queue pair to be ready\n");
       }
     else
       //logger(LOG_DEBUG, "Queue pair modified to be ready");
@@ -274,17 +282,21 @@ struct RdmaTransport {
     if (registerMemoryRegions(protectionDomain, manager) != SUCCESS)
       {
         //logger(LOG_CRIT, "Unable to allocate memory regions");
+	//exit(FAILURE);
+
 	fprintf(stderr, "ERR:\tUnable to allocate memory regions\n");
-        exit(FAILURE);
+	throw std::runtime_error("ERR:\tUnable to allocate memory regions\n");
       }
 
     /* perform the rdma data transfer */
     if (ibv_req_notify_cq(receiveCompletionQueue, 0) != SUCCESS)
       {
         //logger(LOG_ERR, "Unable to request receive completion queue notifications");
+        //if (mode == RECV_MODE)
+	//  exit(FAILURE);
+
 	fprintf(stderr, "ERR:\tUnable to request receive completion queue notifications\n");
-        if (mode == RECV_MODE)
-	  exit(FAILURE);
+	throw std::runtime_error("ERR:\tUnable to request receive completion queue notifications\n");
       }
     if (ibv_req_notify_cq(sendCompletionQueue, 0) != SUCCESS)
       {
@@ -415,7 +427,8 @@ struct RdmaTransport {
     if (previousImmediateData+(uint32_t)1 != (uint32_t)0)
       {
 	//logger(LOG_ERR, "Assertion that UINT32_MAX+1 == 0 has failed, so error checking immediate values");
-	fprintf(stderr, "ERR:\tAssertion that UINT32_MAX+1 == 0 has failed, so error checking immediate values\n");
+	//fprintf(stderr, "ERR:\tAssertion that UINT32_MAX+1 == 0 has failed, so error checking immediate values\n");
+	throw std::runtime_error("ERR:\tAssertion that UINT32_MAX+1 == 0 has failed, so error checking immediate values\n");
       }
     numWorkRequestsMissing = 0; /* determined by finding non-incrementing immediate data values */
     regionIndex = 0;
@@ -445,6 +458,7 @@ struct RdmaTransport {
 	      {
                 //logger(LOG_ERR, "Unable to post receive request with error %d", errno);
 		fprintf(stderr, "ERR:\tUnable to post receive request with error %d\n", errno);
+		throw std::runtime_error("ERR:\tUnable to post receive request with error\n");
 	      }
             else
 	      {
@@ -484,6 +498,7 @@ struct RdmaTransport {
 	      {
                 //logger(LOG_ERR, "Unable to post send request with error %d", errno);
 		fprintf(stderr, "ERR:\tUnable to post send request with error %d\n", errno);
+		throw std::runtime_error("ERR:\tUnable to post send request with error");
 	      }
             else
 	      {
@@ -527,8 +542,10 @@ struct RdmaTransport {
     if (ibv_get_cq_event(eventChannel, &eventCompletionQueue, &eventContext) != SUCCESS)
       {
         //logger(LOG_ERR, "Error while waiting for completion queue event");
+	//return FAILURE;
+	
 	fprintf(stderr, "ERR:\tError while waiting for completion queue event\n");
-        return FAILURE;
+	throw std::runtime_error("ERR:\tError while waiting for completion queue event\n");
       }
     /* assert: eventCompletionQueue is either receiveCompletionQueue or sendCompletionQueue */
     /* assert: eventContext is rdmaDeviceContext */
@@ -559,6 +576,7 @@ struct RdmaTransport {
 	  {
             //logger(LOG_ERR, "Receiver unable to wait for completion notification");
 	    fprintf(stderr, "ERR:\tReceiver unable to wait for completion notification\n");
+	    throw std::runtime_error("ERR:\tReceiver unable to wait for completion notification\n");
 	  }
       }
     else
@@ -569,10 +587,11 @@ struct RdmaTransport {
 	  {
             //logger(LOG_ERR, "Sender unable to wait for completion notification");
 	    fprintf(stderr, "ERR:\tSender unable to wait for completion notification\n");
+	    throw std::runtime_error("ERR:\tSender unable to wait for completion notification\n");
 	  }
       }
   }
-
+  
   void pollRequests()
   {
     numCompletionsFound = 0;
@@ -581,17 +600,26 @@ struct RdmaTransport {
     
     if (mode == RECV_MODE)
       {
-	// Change here for vector
+	// We do not need to reset the size here as the size will be returned seperately as numCompletionsFound
 	numCompletionsFound = ibv_poll_cq(receiveCompletionQueue, maxWorkRequestDequeue, workCompletions.data());
-	workCompletions.resize(numCompletionsFound);
-	// setup workCompletions size here
       }
     else
-      {	
-	// change for vector
+      {
+	// We do not need to reset the size here as the size will be returned seperately as numCompletionsFound
 	numCompletionsFound = ibv_poll_cq(sendCompletionQueue, maxWorkRequestDequeue, workCompletions.data());
-	workCompletions.resize(numCompletionsFound);
       }
+  }
+
+  // Easy way to get class member
+  int get_numCompletionsFound()
+  {
+    return numCompletionsFound;
+  }
+
+  // A easy way to get a vector of struct from python
+  std::vector<struct ibv_wc> get_workCompletions()
+  {
+    return workCompletions;
   }
   
   virtual ~RdmaTransport()
@@ -702,19 +730,19 @@ PYBIND11_MODULE(rdma_transport, m) {
 	 const std::string &,
 	 uint32_t>())
 
-    .def_readonly("workCompletions", &RdmaTransport::workCompletions)
-    .def_readonly("numCompletionsFound", &RdmaTransport::numCompletionsFound)
+    //.def_readonly("workCompletions", &RdmaTransport::workCompletions)
+    //.def_readonly("numCompletionsFound", &RdmaTransport::numCompletionsFound)
     //.def_readwrite("sendCompletionQueue", &RdmaTransport::sendCompletionQueue)
     //.def_readwrite("receiveCompletionQueue", &RdmaTransport::receiveCompletionQueue)
 
-    .def("pollRequests", &RdmaTransport::pollRequests)
-    .def("waitRequestsCompletion", &RdmaTransport::waitRequestsCompletion)
-    .def("issueRequests", &RdmaTransport::issueRequests)
-    .def("say_hello", &RdmaTransport::say_hello)
-    .def("addition", &RdmaTransport::addition);
+    .def("get_numCompletionsFound", &RdmaTransport::get_numCompletionsFound)
+    .def("get_workCompletions",     &RdmaTransport::get_workCompletions)    
+    .def("pollRequests",            &RdmaTransport::pollRequests)
+    .def("waitRequestsCompletion",  &RdmaTransport::waitRequestsCompletion)
+    .def("issueRequests",           &RdmaTransport::issueRequests)
+    .def("say_hello",               &RdmaTransport::say_hello)
+    .def("addition",                &RdmaTransport::addition);
 
-
-  py::exception<RdmaException> exc(m, "RdmaException");
 
   // To create a buffer
   // https://pybind11.readthedocs.io/en/stable/advanced/pycpp/numpy.html

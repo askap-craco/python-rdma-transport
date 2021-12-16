@@ -1,8 +1,7 @@
 from rdma_transport import RdmaTransport
 from rdma_transport import runMode
 from rdma_transport import logType
-from rdma_transport import ibv_cq
-from rdma_transport import RdmaException
+from rdma_transport import ibv_wc
 
 def test_hello():
     # From the C sources aboutmaxIlinedadtaSize
@@ -23,33 +22,36 @@ def test_hello():
     numMetricAveraging = 0
 
   
-    t = RdmaTransport(requestLogLevel, 
-                      mode, 
-                      messageSize,
-                      numMemoryBlocks,
-                      numContiguousMessages,
-                      dataFileName,
-                      numTotalMessages,
-                      messageDelayTime,
-                      rdmaDeviceName,
-                      rdmaPort,
-                      gidIndex,
-                      identifierFileName,
-                      metricURL,
-                      numMetricAveraging)
-
-    t.issueRequests()
-
-    t.waitRequestsCompltion()
-
-    t.pollRequests()
+    rdma_transport = RdmaTransport(requestLogLevel, 
+                                   mode, 
+                                   messageSize,
+                                   numMemoryBlocks,
+                                   numContiguousMessages,
+                                   dataFileName,
+                                   numTotalMessages,
+                                   messageDelayTime,
+                                   rdmaDeviceName,
+                                   rdmaPort,
+                                   gidIndex,
+                                   identifierFileName,
+                                   metricURL,
+                                   numMetricAveraging)
     
-    t.say_hello()
+    rdma_transportissueRequests()
 
-    a = 2
-    b = 3
+    rdma_transportwaitRequestsCompltion()
 
-    c = t.addition(a, b)
+    rdma_transportpollRequests()
+
+    numCompletionsFound = rdma_transportget_numCompletionsFound()
+    workCompletions     = rdma_transportget_workCompletions
     
-    assert c == (a+b)
-    print(f"We get c = {c} with addition of {a} and {b}")
+    #rdma_transportsay_hello()
+    #
+    #a = 2
+    #b = 3
+    #
+    #c = rdma_transportaddition(a, b)
+    #
+    #assert c == (a+b)
+    #print(f"We get c = {c} with addition of {a} and {b}")
