@@ -36,21 +36,11 @@ def test_hello():
                                    metricURL,
                                    numMetricAveraging)
     
-    rdma_transportissueRequests()
+    rdma_transport.issueRequests()
 
-    rdma_transportwaitRequestsCompltion()
+    rdma_transport.waitRequestsCompletion()
 
-    rdma_transportpollRequests()
+    rdma_transport.pollRequests()
 
-    numCompletionsFound = rdma_transportget_numCompletionsFound()
-    workCompletions     = rdma_transportget_workCompletions
-    
-    #rdma_transportsay_hello()
-    #
-    #a = 2
-    #b = 3
-    #
-    #c = rdma_transportaddition(a, b)
-    #
-    #assert c == (a+b)
-    #print(f"We get c = {c} with addition of {a} and {b}")
+    numCompletionsFound = rdma_transport.get_numCompletionsFound()
+    workCompletions     = rdma_transport.get_workCompletions

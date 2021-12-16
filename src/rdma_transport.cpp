@@ -309,62 +309,100 @@ struct RdmaTransport {
 	fprintf(stderr, "ERR:\tUnable to allocate memory regions\n");
 	throw std::runtime_error("ERR:\tUnable to allocate memory regions\n");
       }
-
+    else
+      {
+	fprintf(stdout, "DEBUG:\tMemory regions registered\n");
+      }
+    
     /* perform the rdma data transfer */
     if (ibv_req_notify_cq(receiveCompletionQueue, 0) != SUCCESS)
       {
         //logger(LOG_ERR, "Unable to request receive completion queue notifications");
         //if (mode == RECV_MODE)
 	//  exit(FAILURE);
-
+	
 	fprintf(stderr, "ERR:\tUnable to request receive completion queue notifications\n");
 	throw std::runtime_error("ERR:\tUnable to request receive completion queue notifications\n");
       }
+    else
+      {
+	fprintf(stdout, "DEBUG:\tCompletion queue sent for receive\n");
+      }
+    
     if (ibv_req_notify_cq(sendCompletionQueue, 0) != SUCCESS)
       {
         //logger(LOG_WARNING, "Unable to request send completion queue notifications");
 	fprintf(stdout, "WARN:\tUnable to request send completion queue notifications\n");
       }
+    else
+      {
+	fprintf(stdout, "DEBUG:\tCompletion queue sent for send\n");
+      }
 
     /* now create work requests*/
     setupRequests();
-
+    fprintf(stdout, "DEBUG:\tRequests setup done\n");
+    
     /* Now setup for work completions */
     setupCompletions();
+    fprintf(stdout, "DEBUG:\tCompletions setup done\n");
   }
 
   void setupRequests()
   {
-
+    /* prepare scatter/gather array specifying buffers to read from or write into */
+    /* note this implementation uses only one sgItem per work request but chains together */
+    /* multiple work requests when numContiguousMessages > 1 */
+    /* Alternatively, could instead use multiple sge, but then need to adjust queue pair specs */
+    struct ibv_sge sgItems[manager->numMemoryRegions][manager->numContiguousMessages];
+    memset(sgItems, 0, sizeof(struct ibv_sge[manager->numMemoryRegions][manager->numContiguousMessages]));
+    int sgListLength = 1; /* only one sgItem per work request */
+	
     if (mode == RECV_MODE)
-      {
-	/* prepare scatter/gather array specifying buffers to read from or write into */
-	/* note this implementation uses only one sgItem per work request but chains together */
-	/* multiple work requests when numContiguousMessages > 1 */
-	/* Alternatively, could instead use multiple sge, but then need to adjust queue pair specs */
-	struct ibv_sge sgItems[manager->numMemoryRegions][manager->numContiguousMessages];
-	memset(sgItems, 0, sizeof(struct ibv_sge[manager->numMemoryRegions][manager->numContiguousMessages]));
-	int sgListLength = 1; /* only one sgItem per work request */
-      
+      {      
 	/* Setup memory space for requests and reset it to 0*/
+	//struct ibv_recv_wr receiveRequests[manager->numMemoryRegions][manager->numContiguousMessages];
+	//memset(receiveRequests, 0, sizeof(struct ibv_recv_wr[manager->numMemoryRegions][manager->numContiguousMessages]));
+
 	receiveRequests = (ibv_recv_wr**) calloc(manager->numMemoryRegions, sizeof(ibv_recv_wr*));
-	for(int i = 0; i < manager->numMemoryRegions; i++){
-	  receiveRequests[i] = (ibv_recv_wr*) calloc(manager->numContiguousMessages, sizeof(ibv_recv_wr));
-	}      
-	memset(receiveRequests, 0, sizeof(struct ibv_recv_wr[manager->numMemoryRegions][manager->numContiguousMessages]));
+	if(receiveRequests == nullptr)
+	  {
+	    throw std::runtime_error("ERR:\tCould not calloc receive requests\n");
+	  }
+	
+	for(int i = 0; i < manager->numMemoryRegions; i++)
+	  {
+	    receiveRequests[i] = (ibv_recv_wr*) calloc(manager->numContiguousMessages, sizeof(ibv_recv_wr));
+	    if(receiveRequests[i] == nullptr)
+	      {
+	      throw std::runtime_error("ERR:\tCould not calloc receive requests\n");
+	      }
+	  }      
+	//memset(receiveRequests, 0, manager->numMemoryRegions*manager->numContiguousMessages*sizeof(struct ibv_recv_wr));
+	
 	for (uint32_t regionIndex=0; regionIndex<manager->numMemoryRegions; regionIndex++)
 	  {
 	    for (uint32_t i=0; i<manager->numContiguousMessages; i++)
 	      {
+		fprintf(stdout, "DEBUG\tSetup %d\t%d\t receiver requests start\n", regionIndex, i);
+		
 		/* prepare one sgItem to receive */
 		sgItems[regionIndex][i].addr = (uint64_t)(manager->memoryRegions[regionIndex]->addr + i*manager->messageSize);
 		sgItems[regionIndex][i].length = manager->messageSize;
 		sgItems[regionIndex][i].lkey = manager->memoryRegions[regionIndex]->lkey;
 
+		//fprintf(stdout, "\n\n\nIAMHERE 1 %d\t%d\t%"PRIu64"\n\n\n", manager->numMemoryRegions, manager->numContiguousMessages, (uint64_t)(regionIndex*manager->numContiguousMessages + i));
+		
 		/* prepare one workRequest with this sgItem */
 		receiveRequests[regionIndex][i].wr_id = (uint64_t)(regionIndex*manager->numContiguousMessages + i); /* gives memory region and location */
+		//fprintf(stdout, "\n\n\nIAMHERE 2\n\n\n");
+
 		receiveRequests[regionIndex][i].sg_list = &sgItems[regionIndex][i];
+		//fprintf(stdout, "\n\n\nIAMHERE 3\n\n\n");
+
 		receiveRequests[regionIndex][i].num_sge = sgListLength;
+
+		
 		if (i == manager->numContiguousMessages-1)
 		  {
 		    receiveRequests[regionIndex][i].next = nullptr; /* note can chain multiple workRequest together for performance */
@@ -373,29 +411,42 @@ struct RdmaTransport {
 		  {
 		    receiveRequests[regionIndex][i].next = &receiveRequests[regionIndex][i+1]; /* chain multiple workRequest together for performance */
 		  }
+
+		fprintf(stdout, "DEBUG\tSetup %d\t%d\t receive requests done\n", regionIndex, i);
 	      }
 	  }
       }
     else
       {
-	/* prepare scatter/gather array specifying buffers to read from or write into */
-	/* note this implementation uses only one sgItem per work request but chains together */
-	/* multiple work requests when numContiguousMessages > 1 */
-	/* Alternatively, could instead use multiple sge, but then need to adjust queue pair specs */
-	struct ibv_sge sgItems[manager->numMemoryRegions][manager->numContiguousMessages];
-	memset(sgItems, 0, sizeof(struct ibv_sge[manager->numMemoryRegions][manager->numContiguousMessages]));
-	int sgListLength = 1; /* only one sgItem per work request */
+	/* Setup memory space for requests and reset it to 0*/
+	//struct ibv_send_wr sendRequests[manager->numMemoryRegions][manager->numContiguousMessages];
+	//memset(sendRequests, 0, sizeof(struct ibv_send_wr[manager->numMemoryRegions][manager->numContiguousMessages]));
 
 	/* Setup memory space for requests and reset it to 0*/
 	sendRequests = (ibv_send_wr**) calloc(manager->numMemoryRegions, sizeof(ibv_send_wr*));
-	for(int i = 0; i < manager->numMemoryRegions; i++){
-	  sendRequests[i] = (ibv_send_wr*) calloc(manager->numContiguousMessages, sizeof(ibv_recv_wr));
-	}
-	memset(sendRequests, 0, sizeof(struct ibv_send_wr[manager->numMemoryRegions][manager->numContiguousMessages]));
+	if(sendRequests == nullptr)
+	  {
+	    throw std::runtime_error("ERR:\tCould not calloc send requests\n");
+	  }
+	
+	for(int i = 0; i < manager->numMemoryRegions; i++)
+	  {
+	  sendRequests[i] = (ibv_send_wr*) calloc(manager->numContiguousMessages, sizeof(ibv_send_wr));
+	  
+	  if(sendRequests[i] == nullptr)
+	    {
+	      throw std::runtime_error("ERR:\tCould not calloc send requests\n");
+	    }
+	  }
+	//memset(sendRequests, 0, manager->numMemoryRegions*manager->numContiguousMessages*sizeof(struct ibv_send_wr));
+	//memset(sendRequests, 0, sizeof(struct ibv_send_wr[manager->numMemoryRegions][manager->numContiguousMessages]));
+
 	for (uint32_t regionIndex=0; regionIndex<manager->numMemoryRegions; regionIndex++)
 	  {
 	    for (uint32_t i=0; i<manager->numContiguousMessages; i++)
 	      {
+		fprintf(stdout, "DEBUG\tSetup %d\t%d\t send requests start\n", regionIndex, i);
+
 		/* prepare one sgItem to send */
 		sgItems[regionIndex][i].addr = (uint64_t)(manager->memoryRegions[regionIndex]->addr + i*manager->messageSize);
 		sgItems[regionIndex][i].length = manager->messageSize;
@@ -419,6 +470,7 @@ struct RdmaTransport {
 		  {
 		    sendRequests[regionIndex][i].next = &sendRequests[regionIndex][i+1]; /* chain multiple workRequest together for performance */
 		  }
+		fprintf(stdout, "DEBUG\tSetup %d\t%d\t send requests done\n", regionIndex, i);
 	      }
 	  }
       }    
@@ -569,16 +621,27 @@ struct RdmaTransport {
 	fprintf(stderr, "ERR:\tError while waiting for completion queue event\n");
 	throw std::runtime_error("ERR:\tError while waiting for completion queue event\n");
       }
+    else
+      {
+	fprintf(stdout, "DEBUF:\tibv_get_cq_event done\n");
+      }
     /* assert: eventCompletionQueue is either receiveCompletionQueue or sendCompletionQueue */
     /* assert: eventContext is rdmaDeviceContext */
     /* acknowledge the one completion queue event */
     ibv_ack_cq_events(eventCompletionQueue, 1);
+    fprintf(stdout, "DEBUF:\tibv_ack_cq_event done\n");
+    
     /* request notification for next completion event on the completion queue */
     if (ibv_req_notify_cq(eventCompletionQueue, 0) != SUCCESS)
       {
         //logger(LOG_WARNING, "Error while receiver requesting completion notification");
 	fprintf(stdout, "WARN:\tError while receiver requesting completion notification\n");
       }
+    else
+      {
+	fprintf(stdout, "DEBUF:\tibv_req_notify_event done\n");
+      }
+
     return SUCCESS;
   }
   
@@ -600,6 +663,10 @@ struct RdmaTransport {
 	    fprintf(stderr, "ERR:\tReceiver unable to wait for completion notification\n");
 	    throw std::runtime_error("ERR:\tReceiver unable to wait for completion notification\n");
 	  }
+	else
+	  {
+	    fprintf(stdout, "DEBUG:\twait for completions done\n");
+	  }
       }
     else
       {
@@ -611,11 +678,18 @@ struct RdmaTransport {
 	    fprintf(stderr, "ERR:\tSender unable to wait for completion notification\n");
 	    throw std::runtime_error("ERR:\tSender unable to wait for completion notification\n");
 	  }
+	
+	else
+	  {
+	    fprintf(stdout, "DEBUG:\twait for completions done\n");
+	  }
       }
   }
   
   void pollRequests()
   {
+    fprintf(stdout, "DEBUG:\tpoll requests now\n");
+    
     numCompletionsFound = 0;
     workCompletions.resize(maxWorkRequestDequeue);
     std::fill(workCompletions.begin(), workCompletions.end(), ibv_wc{0});
