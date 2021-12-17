@@ -60,9 +60,6 @@ def test_memorybuffer_throws_exception(transport):
 
 def test_hello(transport):
     transport.say_hello()
-
-
-
     
 def test_requests():
     '''Maybe done in anotehr test file'''
