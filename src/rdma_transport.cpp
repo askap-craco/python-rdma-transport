@@ -768,7 +768,8 @@ struct RdmaTransport {
   py::memoryview get_memoryview(uint32_t blockid) {
     uint64_t memoryBlockSize = messageSize * numContiguousMessages;
     if (blockid >= numMemoryBlocks) {
-      throw std::runtime_error("blockid exceeds numMemoryBlocks");
+      //throw std::runtime_error("blockid exceeds numMemoryBlocks");
+      throw py::index_error("blockid exceeds numMemoryBlocks");
     }
     return py::memoryview::from_memory(
                                        memoryBlocks[blockid], // pointer
