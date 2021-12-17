@@ -24,7 +24,7 @@ def transport():
     rdmaDeviceName = "mlx5_1"
     rdmaPort = 1
     gidIndex = -1
-    identifierFileName = 'hello'
+    identifierFileName = 'exchange'
     metricURL = None
     numMetricAveraging = 0
   

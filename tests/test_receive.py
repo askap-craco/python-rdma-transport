@@ -3,10 +3,10 @@ from rdma_transport import runMode
 from rdma_transport import logType
 from rdma_transport import ibv_wc
 
-def test_receive_message():
+def test_receive_messages():
     # From the C sources aboutmaxIlinedadtaSize
     # must be zero NOTE put back at 236 once testing completed
-    requestLogLevel = logType.LOG_NOTICE
+    requestLogLevel = logType.LOG_DEBUG
     mode = runMode.RECV_MODE
     messageSize = 65536
     numMemoryBlocks = 1
@@ -17,7 +17,7 @@ def test_receive_message():
     rdmaDeviceName = None #"mlx5_1"
     rdmaPort = 1
     gidIndex = -1
-    #identifierFileName = None 
+    identifierFileName = None 
     identifierFileName = "exchange"
     metricURL = None
     numMetricAveraging = 0
@@ -55,5 +55,5 @@ def test_receive_message():
     print(f"Number of numCompletionsFound {numCompletionsFound}, and workCompletions {workCompletions}")
 
 
-if __name__ == "__main__":
-    test_receive_message()
+if __name__ == '__main__':
+    test_receive_messages()
