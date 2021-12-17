@@ -756,6 +756,25 @@ struct RdmaTransport {
   void say_hello() {
     printf("Hello! \n");
   }
+
+  /***
+   * Returns a python memoryview of a memory buffer allocated by memorymanager
+   * given by the blockid
+   * 
+   * @param blockid blockid of the block. Must be less than numMemoryBlocks
+   * @returns py::memoryview of the given block with memoryblcoksize
+   * @throws runtime_error if blockid >= numMemoryBlocks
+   */
+  py::memoryview get_memoryview(uint32_t blockid) {
+    uint64_t memoryBlockSize = messageSize * numContiguousMessages;
+    if (blockid >= numMemoryBlocks) {
+      throw std::runtime_error("blockid exceeds numMemoryBlocks");
+    }
+    return py::memoryview::from_memory(
+                                       memoryBlocks[blockid], // pointer
+                                       memoryBlockSize  // size
+                                       );
+  }
 };
 
 PYBIND11_MODULE(rdma_transport, m) {
@@ -832,7 +851,8 @@ PYBIND11_MODULE(rdma_transport, m) {
     .def("waitRequestsCompletion",  &RdmaTransport::waitRequestsCompletion)
     .def("issueRequests",           &RdmaTransport::issueRequests)
     .def("say_hello",               &RdmaTransport::say_hello)
-    .def("addition",                &RdmaTransport::addition);
+    .def("addition",                &RdmaTransport::addition)
+    .def("get_memoryview",          &RdmaTransport::get_memoryview);
 
 
   // To create a buffer
