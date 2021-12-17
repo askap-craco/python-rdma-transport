@@ -1,9 +1,12 @@
 #include "rdma_transport.hpp"
+#include "rdma_transport_simpletest.hpp"
+
 extern "C" {
 #include "RDMAapi.h"
 //#include "RDMAmemorymanager.h"
 //#include "RDMAexchangeidcallbacks.h"
 }
+
 
 
 // How to print on terminal, okay
@@ -362,6 +365,7 @@ struct RdmaTransport {
     struct ibv_sge sgItems[manager->numMemoryRegions][manager->numContiguousMessages];
     memset(sgItems, 0, sizeof(struct ibv_sge[manager->numMemoryRegions][manager->numContiguousMessages]));
     int sgListLength = 1; /* only one sgItem per work request */
+    assert(mode == RECV_MODE || mode == SEND_MODE);
 	
     if (mode == RECV_MODE)
       {      
@@ -369,6 +373,7 @@ struct RdmaTransport {
 	//struct ibv_recv_wr receiveRequests[manager->numMemoryRegions][manager->numContiguousMessages];
 	//memset(receiveRequests, 0, sizeof(struct ibv_recv_wr[manager->numMemoryRegions][manager->numContiguousMessages]));
 
+        assert(manager->numMemoryRegions > 0);
 	receiveRequests = (ibv_recv_wr**) calloc(manager->numMemoryRegions, sizeof(ibv_recv_wr*));
 	if(receiveRequests == nullptr)
 	  {
@@ -377,6 +382,7 @@ struct RdmaTransport {
 	
 	for(int i = 0; i < manager->numMemoryRegions; i++)
 	  {
+            assert(manager->numContiguousMessages > 0);
 	    receiveRequests[i] = (ibv_recv_wr*) calloc(manager->numContiguousMessages, sizeof(ibv_recv_wr));
 	    if(receiveRequests[i] == nullptr)
 	      {
@@ -390,7 +396,7 @@ struct RdmaTransport {
 	    for (uint32_t i=0; i<manager->numContiguousMessages; i++)
 	      {
 		fprintf(stdout, "DEBUG\tSetup %d\t%d\t receiver requests start\n", regionIndex, i);
-		
+		assert(manager->messageSize > 0);
 		/* prepare one sgItem to receive */
 		sgItems[regionIndex][i].addr = (uint64_t)(manager->memoryRegions[regionIndex]->addr + i*manager->messageSize);
 		sgItems[regionIndex][i].length = manager->messageSize;
@@ -482,7 +488,8 @@ struct RdmaTransport {
   }
 
   void setupCompletions()
-  {    
+  {
+    assert(queueCapacity > 0);
     /* setup for loop enqueueing blocks of work requests and polling for blocks of work completions */
     minWorkRequestEnqueue = (uint32_t) ceil(queueCapacity * MIN_WORK_REQUEST_ENQUEUE);
     maxWorkRequestDequeue = queueCapacity; /* try to completely drain queue of any completed work requests */
@@ -526,7 +533,7 @@ struct RdmaTransport {
     This function only issue requests for minWorkRequestEnqueue
    */
   void issueRequests(){
-
+    assert(mode == RECV_MODE || mode == SEND_MODE);
     if ( mode == RECV_MODE)
       {	
         /* post block of receive work requests to sufficiently full work request queue */
@@ -618,6 +625,7 @@ struct RdmaTransport {
     /* wait until get completion queue event */
     struct ibv_cq *eventCompletionQueue;
     void *eventContext;
+    assert(eventChannel != NULL);
     if (ibv_get_cq_event(eventChannel, &eventCompletionQueue, &eventContext) != SUCCESS)
       {
         //logger(LOG_ERR, "Error while waiting for completion queue event");
@@ -855,6 +863,7 @@ PYBIND11_MODULE(rdma_transport, m) {
     .def("addition",                &RdmaTransport::addition)
     .def("get_memoryview",          &RdmaTransport::get_memoryview);
 
+  m.def("run_test", &run_test);
 
   // To create a buffer
   // https://pybind11.readthedocs.io/en/stable/advanced/pycpp/numpy.html
