@@ -3,7 +3,7 @@ from rdma_transport import runMode
 from rdma_transport import logType
 from rdma_transport import ibv_wc
 
-def test_hello():
+def test_send_messages():
     # From the C sources aboutmaxIlinedadtaSize
     # must be zero NOTE put back at 236 once testing completed
     requestLogLevel = logType.LOG_NOTICE
@@ -53,3 +53,7 @@ def test_hello():
     print("got workCompletions")
     
     print(f"Number of numCompletionsFound {numCompletionsFound}, and workCompletions {workCompletions}")
+
+
+if __name__ == '__main__':
+    test_send_messages()
