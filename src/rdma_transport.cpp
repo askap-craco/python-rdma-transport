@@ -73,6 +73,9 @@ struct RdmaTransport {
   /* These two will be accessed outside*/
   int numCompletionsFound;
   std::vector<struct ibv_wc> workCompletions; // resize it in contructor
+
+  /* these sgItems need to are setup in setupRequests */
+  struct ibv_sge** sgItems;
   
   RdmaTransport(enum logType _requestLogLevel,
 		enum runMode _mode,
@@ -347,6 +350,16 @@ struct RdmaTransport {
 	  }
       }
 
+    // setup buffer for work requests that lives on the heap. The original one was on the stack
+    //struct ibv_sge sgItems[manager->numMemoryRegions][manager->numContiguousMessages];
+    //memset(sgItems, 0, sizeof(struct ibv_sge[manager->numMemoryRegions][manager->numContiguousMessages]));
+
+    sgItems = new struct ibv_sge*[manager->numMemoryRegions];
+    for(auto iregion = 0; iregion < manager->numMemoryRegions; iregion++) {
+      sgItems[iregion] = new struct ibv_sge[manager->numContiguousMessages];
+    }
+
+
     /* now create work requests*/
     setupRequests();
     fprintf(stdout, "DEBUG:\tRequests setup done\n");
@@ -362,8 +375,7 @@ struct RdmaTransport {
     /* note this implementation uses only one sgItem per work request but chains together */
     /* multiple work requests when numContiguousMessages > 1 */
     /* Alternatively, could instead use multiple sge, but then need to adjust queue pair specs */
-    struct ibv_sge sgItems[manager->numMemoryRegions][manager->numContiguousMessages];
-    memset(sgItems, 0, sizeof(struct ibv_sge[manager->numMemoryRegions][manager->numContiguousMessages]));
+
     int sgListLength = 1; /* only one sgItem per work request */
     assert(mode == RECV_MODE || mode == SEND_MODE);
 	
@@ -540,6 +552,7 @@ struct RdmaTransport {
         while ((numWorkRequestsEnqueued + numWorkRequestsMissing < manager->numTotalMessages)
 	       && (currentQueueLoading < minWorkRequestEnqueue))
 	  {
+            assert(regionIndex < manager->numMemoryRegions);
             if (ibv_post_recv(queuePair, &receiveRequests[regionIndex][0], &badReceiveRequest) != SUCCESS)
 	      {
                 //logger(LOG_ERR, "Unable to post receive request with error %d", errno);
@@ -752,6 +765,11 @@ struct RdmaTransport {
 
     /* free memory block buffers */
     freeMemoryBlocks(memoryBlocks, numMemoryBlocks);
+
+    for(auto iregion = 0; iregion < manager->numMemoryRegions; iregion++) {
+      delete [] sgItems[iregion];
+    }
+    delete [] sgItems;
 
     //logger(LOG_INFO, "Receive Visibilities ending");
     fprintf(stdout, "INFO:\tReceive Visibilities ending\n");

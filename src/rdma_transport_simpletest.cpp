@@ -18,8 +18,6 @@ void run_test(
              uint32_t numMetricAveraging  /* number of message completions over which to average metrics, default to numMemoryBlocks*numContiguousMessages */
               ) {
 
-std::cout << " identifier2 =" << identifierFileName << std::endl;
-  
     if (numTotalMessages == 0)
         numTotalMessages = numMemoryBlocks * numContiguousMessages;
     if (numMetricAveraging == 0)

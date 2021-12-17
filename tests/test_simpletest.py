@@ -1,11 +1,12 @@
-from rdma_transport import RdmaTransport
 from rdma_transport import runMode
 from rdma_transport import logType
 from rdma_transport import ibv_wc
+import rdma_transport
 
-def test_receive_messages():
-    # From the C sources aboutmaxIlinedadtaSize
-    # must be zero NOTE put back at 236 once testing completed
+import numpy as np
+import pytest
+
+def do_run_test():
     requestLogLevel = logType.LOG_DEBUG
     mode = runMode.RECV_MODE
     messageSize = 65536
@@ -14,15 +15,14 @@ def test_receive_messages():
     dataFileName = None
     numTotalMessages = 0
     messageDelayTime = 0
-    rdmaDeviceName = None #"mlx5_1"
+    rdmaDeviceName = None
     rdmaPort = 1
     gidIndex = -1
-    identifierFileName = None 
-    identifierFileName = "exchange"
+    identifierFileName = 'exchange'
     metricURL = None
     numMetricAveraging = 0
   
-    rdma_transport = RdmaTransport(requestLogLevel, 
+    t = rdma_transport.run_test(requestLogLevel, 
                                    mode, 
                                    messageSize,
                                    numMemoryBlocks,
@@ -36,24 +36,9 @@ def test_receive_messages():
                                    identifierFileName,
                                    metricURL,
                                    numMetricAveraging)
-    
-    rdma_transport.issueRequests()
-    print("issue requests done")
-    
-    rdma_transport.waitRequestsCompletion()
-    print("wait requests completion done")
-    
-    rdma_transport.pollRequests()
-    print("poll requests done")
-
-    numCompletionsFound = rdma_transport.get_numCompletionsFound()
-    print("got numCompletionsFound")
-    
-    workCompletions = rdma_transport.get_workCompletions
-    print("got workCompletions")
-    
-    print(f"Number of numCompletionsFound {numCompletionsFound}, and workCompletions {workCompletions}")
-
+    return t
 
 if __name__ == '__main__':
-    test_receive_messages()
+    do_run_test()
+    
+    
