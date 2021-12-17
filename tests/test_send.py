@@ -38,11 +38,18 @@ def test_hello():
                                    numMetricAveraging)
     
     rdma_transport.issueRequests()
-
-    rdma_transport.waitRequestsCompletion()
-
-    rdma_transport.pollRequests()
-
-    numCompletionsFound = rdma_transport.get_numCompletionsFound()
-    workCompletions     = rdma_transport.get_workCompletions
+    print("issue requests done")
     
+    rdma_transport.waitRequestsCompletion()
+    print("wait requests completion done")
+    
+    rdma_transport.pollRequests()
+    print("poll requests done")
+    
+    numCompletionsFound = rdma_transport.get_numCompletionsFound()
+    print("got numCompletionsFound")
+    
+    workCompletions = rdma_transport.get_workCompletions
+    print("got workCompletions")
+    
+    print(f"Number of numCompletionsFound {numCompletionsFound}, and workCompletions {workCompletions}")
