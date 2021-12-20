@@ -2,6 +2,7 @@ from rdma_transport import RdmaTransport
 from rdma_transport import runMode
 from rdma_transport import logType
 from rdma_transport import ibv_wc
+import numpy as np
 
 def test_receive_messages():
     # From the C sources aboutmaxIlinedadtaSize
@@ -18,7 +19,7 @@ def test_receive_messages():
     rdmaPort = 1
     gidIndex = -1
     identifierFileName = None 
-    identifierFileName = "exchange"
+    #identifierFileName = "exchange"
     metricURL = None
     numMetricAveraging = 0
   
@@ -36,6 +37,19 @@ def test_receive_messages():
                                    identifierFileName,
                                    metricURL,
                                    numMetricAveraging)
+
+    packetSequenceNumber = rdma_transport.getPacketSequenceNumber()
+    print(f"Local packet sequence number is {packetSequenceNumber}")
+
+    queuePairNumber = rdma_transport.getQueuePairNumber()
+    print(f"Local queue pair number is {queuePairNumber}")
+    
+    gidAddress = rdma_transport.getGidAddress()
+    gidAddress = np.frombuffer(gidAddress, dtype=np.uint8)
+    print(f"Local gid address is {gidAddress}")
+    
+    localIdentifier = rdma_transport.getLocalIdentifier()
+    print(f"Local identifier is {localIdentifier}")
     
     rdma_transport.issueRequests()
     print("issue requests done")

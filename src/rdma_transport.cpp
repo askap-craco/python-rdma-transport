@@ -76,7 +76,13 @@ struct RdmaTransport {
 
   /* these sgItems need to are setup in setupRequests */
   struct ibv_sge** sgItems;
-  
+
+  /* information for remote machine to pair with */
+  uint32_t packetSequenceNumber;
+  uint32_t queuePairNumber;
+  union ibv_gid gidAddress;
+  uint16_t localIdentifier;
+    
   RdmaTransport(enum logType _requestLogLevel,
 		enum runMode _mode,
 		uint32_t _messageSize,
@@ -236,10 +242,11 @@ struct RdmaTransport {
 
     /* initialise the random number generator to generate a 24-bit psn */
     srand(getpid() * time(nullptr));
-    uint32_t packetSequenceNumber = (uint32_t) (rand() & 0x00FFFFFF);
+    packetSequenceNumber = (uint32_t) (rand() & 0x00FFFFFF);
 
     /* exchange the necessary information with the remote RDMA peer */
-    uint32_t queuePairNumber = queuePair->qp_num;
+    queuePairNumber = queuePair->qp_num;
+    
     uint32_t remotePSN;
     uint32_t remoteQPN;
     union ibv_gid remoteGID;
@@ -367,6 +374,21 @@ struct RdmaTransport {
     /* Now setup for work completions */
     setupCompletions();
     fprintf(stdout, "DEBUG:\tCompletions setup done\n");
+  }
+
+  uint32_t getPacketSequenceNumber()
+  {
+    return packetSequenceNumber;
+  }
+  
+  uint32_t getQueuePairNumber()
+  {
+    return queuePairNumber;
+  }
+  
+  uint16_t getLocalIdentifier()
+  {
+    return localIdentifier;
   }
 
   void setupRequests()
@@ -802,6 +824,13 @@ struct RdmaTransport {
                                        memoryBlockSize  // size
                                        );
   }
+  
+  py::memoryview getGidAddress() {    
+    return py::memoryview::from_memory(
+                                       gidAddress.raw, // pointer
+                                       sizeof(gidAddress.raw)  // size
+                                       );
+  }
 };
 
 PYBIND11_MODULE(rdma_transport, m) {
@@ -871,6 +900,12 @@ PYBIND11_MODULE(rdma_transport, m) {
     //.def_readonly("numCompletionsFound", &RdmaTransport::numCompletionsFound)
     //.def_readwrite("sendCompletionQueue", &RdmaTransport::sendCompletionQueue)
     //.def_readwrite("receiveCompletionQueue", &RdmaTransport::receiveCompletionQueue)
+
+    
+    .def("getPacketSequenceNumber", &RdmaTransport::getPacketSequenceNumber)
+    .def("getQueuePairNumber",      &RdmaTransport::getQueuePairNumber)
+    .def("getGidAddress",           &RdmaTransport::getGidAddress)
+    .def("getLocalIdentifier",      &RdmaTransport::getLocalIdentifier)
 
     .def("get_numCompletionsFound", &RdmaTransport::get_numCompletionsFound)
     .def("get_workCompletions",     &RdmaTransport::get_workCompletions)    
