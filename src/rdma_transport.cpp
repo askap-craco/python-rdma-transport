@@ -82,7 +82,8 @@ struct RdmaTransport {
   uint32_t queuePairNumber;
   union ibv_gid gidAddress;
   uint16_t localIdentifier;
-    
+  enum ibv_mtu mtu;
+  
   RdmaTransport(enum logType _requestLogLevel,
 		enum runMode _mode,
 		uint32_t _messageSize,
@@ -221,9 +222,9 @@ struct RdmaTransport {
       fprintf(stdout, "DEBUG:\tRDMA resources allocated\n");
 
     /* set up the RDMA connection */
-    uint16_t localIdentifier;
-    union ibv_gid gidAddress;
-    enum ibv_mtu mtu;
+    //uint16_t localIdentifier;
+    //union ibv_gid gidAddress;
+    //enum ibv_mtu mtu;
     if (setupRDMAConnection(rdmaDeviceContext, rdmaPort, &localIdentifier,
 			    &gidAddress, &gidIndex, &mtu) != SUCCESS)
       {
