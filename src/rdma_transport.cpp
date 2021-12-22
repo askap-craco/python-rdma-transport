@@ -3,8 +3,8 @@
 
 extern "C" {
 #include "RDMAapi.h"
-//#include "RDMAmemorymanager.h"
-//#include "RDMAexchangeidcallbacks.h"
+  //#include "RDMAmemorymanager.h"
+  //#include "RDMAexchangeidcallbacks.h"
 }
 
 
@@ -18,7 +18,7 @@ struct RdmaTransport {
   /*
     set up default values that might be overriden when creating a instance of the class 
     these setups are from outside
-*/
+  */
   enum logType requestLogLevel = LOG_NOTICE;
   enum runMode mode = RECV_MODE;
   uint32_t messageSize = 65536; /* size in bytes of single RDMA message */
@@ -253,49 +253,26 @@ struct RdmaTransport {
 
   void setupRdma()
   {
-    /* create a pointer to an identifier exchange function (see eg RDMAexchangeidentifiers for some examples) */
-    enum exchangeResult (*identifierExchangeFunction)(bool isSendMode,
-						      uint32_t packetSequenceNumber, uint32_t queuePairNumber, union ibv_gid gidAddress, uint16_t localIdentifier,
-						      uint32_t *remotePSNPtr, uint32_t *remoteQPNPtr, union ibv_gid *remoteGIDPtr, uint16_t *remoteLIDPtr) = nullptr;
-
     fprintf(stdout, "identifier file name is %s\n", identifier_filename);
-    
+
+    /* We either exchange information with shared file or with messages, no stdio anymore */ 
     if (identifier_filename != nullptr)
       {
         setIdentifierFileName(identifier_filename);
-        identifierExchangeFunction = exchangeViaSharedFiles;
+	
+    	fprintf(stdout, "I am here???\n");
+    	if (exchangeViaSharedFiles(mode==SEND_MODE,
+				   packetSequenceNumber, queuePairNumber, gidAddress, localIdentifier,
+				   &remotePSN, &remoteQPN, &remoteGID, &remoteLID) != EXCH_SUCCESS)
+    	  {
+    	    //logger(LOG_CRIT, "Unable to exchange identifiers via provided exchange function");
+    	    //exit(FAILURE);
+    	    fprintf(stderr, "ERR:\tUnable to exchange identifiers via provided exchange function\n");
+    	    throw std::runtime_error("ERR:\tUnable to exchange identifiers via provided exchange function\n");
+    	  }
+	
       }
-
-    if (identifierExchangeFunction == nullptr)
-      {
-        if (exchangeViaStdIO(mode==SEND_MODE,
-			     packetSequenceNumber, queuePairNumber, gidAddress, localIdentifier,
-			     &remotePSN, &remoteQPN, &remoteGID, &remoteLID) != EXCH_SUCCESS)
-	  {
-            //logger(LOG_CRIT, "Unable to exchange identifiers via standard IO");
-	    //exit(FAILURE);
-	    
-	    fprintf(stderr, "ERR:\tUnable to exchange identifiers via standard IO\n");
-	    throw std::runtime_error("ERR:\tUnable to exchange identifiers via standard IO");
-	  }
-      }
-    else
-      {
-	//fprintf(stdout, "I am here???\n");
-        if (identifierExchangeFunction(mode==SEND_MODE,
-				       packetSequenceNumber, queuePairNumber, gidAddress, localIdentifier,
-				       &remotePSN, &remoteQPN, &remoteGID, &remoteLID) != EXCH_SUCCESS)
-	  {
-            //logger(LOG_CRIT, "Unable to exchange identifiers via provided exchange function");
-	    //exit(FAILURE);
-	    fprintf(stderr, "ERR:\tUnable to exchange identifiers via provided exchange function\n");
-	    throw std::runtime_error("ERR:\tUnable to exchange identifiers via provided exchange function\n");
-	  }
-
-      }
-    
-    //fprintf(stdout, "I am here???\n");
-
+  
     /* modify the queue pair to be ready to receive and possibly send */
     if (modifyQueuePairReady(queuePair, rdmaPort, gidIndex, mode, packetSequenceNumber,
 			     remotePSN, remoteQPN, remoteGID, remoteLID, mtu) != SUCCESS)
@@ -388,6 +365,32 @@ struct RdmaTransport {
     return localIdentifier;
   }
 
+  void setPacketSequenceNumber(uint32_t _remotePSN)
+  {
+    remotePSN = _remotePSN;
+  }
+  
+  void setQueuePairNumber(uint32_t _remoteQPN)
+  {
+    remoteQPN = _remoteQPN;
+  }
+  
+  void setLocalIdentifier(uint16_t _remoteLID)
+  {
+    remoteLID = _remoteLID;
+  }
+
+  void setGidAddress(py::array_t<uint8_t>& _remoteGID_raw)
+  {
+    py::buffer_info remoteGID_raw = _remoteGID_raw.request();
+
+    uint8_t* ptr = (uint8_t*)remoteGID_raw.ptr;
+    
+    for(int i = 0; i < 16; i++){
+      remoteGID.raw[i] = ptr[i];
+    }
+  }
+
   void setupRequests()
   {
     /* prepare scatter/gather array specifying buffers to read from or write into */
@@ -417,7 +420,7 @@ struct RdmaTransport {
 	    receiveRequests[i] = (ibv_recv_wr*) calloc(manager->numContiguousMessages, sizeof(ibv_recv_wr));
 	    if(receiveRequests[i] == nullptr)
 	      {
-	      throw std::runtime_error("ERR:\tCould not calloc receive requests\n");
+		throw std::runtime_error("ERR:\tCould not calloc receive requests\n");
 	      }
 	  }      
 	//memset(receiveRequests, 0, manager->numMemoryRegions*manager->numContiguousMessages*sizeof(struct ibv_recv_wr));
@@ -473,12 +476,12 @@ struct RdmaTransport {
 	
 	for(int i = 0; i < manager->numMemoryRegions; i++)
 	  {
-	  sendRequests[i] = (ibv_send_wr*) calloc(manager->numContiguousMessages, sizeof(ibv_send_wr));
+	    sendRequests[i] = (ibv_send_wr*) calloc(manager->numContiguousMessages, sizeof(ibv_send_wr));
 	  
-	  if(sendRequests[i] == nullptr)
-	    {
-	      throw std::runtime_error("ERR:\tCould not calloc send requests\n");
-	    }
+	    if(sendRequests[i] == nullptr)
+	      {
+		throw std::runtime_error("ERR:\tCould not calloc send requests\n");
+	      }
 	  }
 	//memset(sendRequests, 0, manager->numMemoryRegions*manager->numContiguousMessages*sizeof(struct ibv_send_wr));
 	//memset(sendRequests, 0, sizeof(struct ibv_send_wr[manager->numMemoryRegions][manager->numContiguousMessages]));
@@ -562,7 +565,7 @@ struct RdmaTransport {
 
   /*
     This function only issue requests for minWorkRequestEnqueue
-   */
+  */
   void issueRequests(){
     assert(mode == RECV_MODE || mode == SEND_MODE);
     if ( mode == RECV_MODE)
@@ -904,6 +907,11 @@ PYBIND11_MODULE(rdma_transport, m) {
     .def("getGidAddress",           &RdmaTransport::getGidAddress)
     .def("getLocalIdentifier",      &RdmaTransport::getLocalIdentifier)
 
+    .def("setPacketSequenceNumber", &RdmaTransport::setPacketSequenceNumber)
+    .def("setQueuePairNumber",      &RdmaTransport::setQueuePairNumber)
+    .def("setGidAddress",           &RdmaTransport::setGidAddress)
+    .def("setLocalIdentifier",      &RdmaTransport::setLocalIdentifier)
+    
     .def("get_numCompletionsFound", &RdmaTransport::get_numCompletionsFound)
     .def("get_workCompletions",     &RdmaTransport::get_workCompletions)    
     .def("pollRequests",            &RdmaTransport::pollRequests)
