@@ -31,6 +31,8 @@ struct RdmaTransport {
   uint8_t rdmaPort = 1;
   int gidIndex = -1; /* preferred gid index or -1 for no preference */
   char* identifierFileName = nullptr; /* default to using stdio for exchanging RDMA identifiers */
+  //char identifierFileName[1024]; /* default to using stdio for exchanging RDMA identifiers */
+  char identifier_filename[1024] = {'0'};
   char* metricURL = nullptr; /* default to not push metrics */
   uint32_t numMetricAveraging = 0; /* number of message completions over which to average metrics, default to numMemoryBlocks*numContiguousMessages */
 
@@ -82,6 +84,13 @@ struct RdmaTransport {
   uint32_t queuePairNumber;
   union ibv_gid gidAddress;
   uint16_t localIdentifier;
+
+  /* information from remote machine */
+  uint32_t remotePSN;
+  uint32_t remoteQPN;
+  union ibv_gid remoteGID;
+  uint16_t remoteLID;
+  
   enum ibv_mtu mtu;
   
   RdmaTransport(enum logType _requestLogLevel,
@@ -113,6 +122,9 @@ struct RdmaTransport {
     metricURL(_metricURL),
     numMetricAveraging(_numMetricAveraging)   
   {
+    strncpy(identifier_filename, identifierFileName, 1024);
+    
+    fprintf(stdout, "identifier file name is %s\n", identifier_filename);
     if (numTotalMessages == 0)
       numTotalMessages = numMemoryBlocks * numContiguousMessages;
     if (numMetricAveraging == 0)
@@ -177,16 +189,6 @@ struct RdmaTransport {
         displayMemoryBlocks(manager, 10, 10); /* display contents that will send */
       }
 
-    /* create a pointer to an identifier exchange function (see eg RDMAexchangeidentifiers for some examples) */
-    enum exchangeResult (*identifierExchangeFunction)(bool isSendMode,
-						      uint32_t packetSequenceNumber, uint32_t queuePairNumber, union ibv_gid gidAddress, uint16_t localIdentifier,
-						      uint32_t *remotePSNPtr, uint32_t *remoteQPNPtr, union ibv_gid *remoteGIDPtr, uint16_t *remoteLIDPtr) = nullptr;
-
-    if (identifierFileName != nullptr)
-      {
-        setIdentifierFileName(identifierFileName);
-        identifierExchangeFunction = exchangeViaSharedFiles;
-      }
     if (numMetricAveraging == 0)
       numMetricAveraging = manager->numMemoryRegions * manager->numContiguousMessages;
 
@@ -247,29 +249,23 @@ struct RdmaTransport {
 
     /* exchange the necessary information with the remote RDMA peer */
     queuePairNumber = queuePair->qp_num;
-    
-    uint32_t remotePSN;
-    uint32_t remoteQPN;
-    union ibv_gid remoteGID;
-    uint16_t remoteLID;
+  }
 
-    //// for some reason identifierExchangeFunction is not nullptr 
-    //if (exchangeViaStdIO(mode==SEND_MODE,
-    //			 packetSequenceNumber, queuePairNumber, gidAddress, localIdentifier,
-    //			 &remotePSN, &remoteQPN, &remoteGID, &remoteLID) != EXCH_SUCCESS)
-    //  {
-    //	//logger(LOG_CRIT, "Unable to exchange identifiers via standard IO");
-    //	//exit(FAILURE);
-    //	
-    //	fprintf(stderr, "ERR:\tUnable to exchange identifiers via standard IO\n");
-    //	throw std::runtime_error("ERR:\tUnable to exchange identifiers via standard IO");
-    //  }
+  void setupRdma()
+  {
+    /* create a pointer to an identifier exchange function (see eg RDMAexchangeidentifiers for some examples) */
+    enum exchangeResult (*identifierExchangeFunction)(bool isSendMode,
+						      uint32_t packetSequenceNumber, uint32_t queuePairNumber, union ibv_gid gidAddress, uint16_t localIdentifier,
+						      uint32_t *remotePSNPtr, uint32_t *remoteQPNPtr, union ibv_gid *remoteGIDPtr, uint16_t *remoteLIDPtr) = nullptr;
 
-    // Force it to nullptr
-    // we need to fix the function so that exchangefilename can be nulptr
-    //identifierExchangeFunction = nullptr;
-    //assert(identifierExchangeFunction == nullptr);
+    fprintf(stdout, "identifier file name is %s\n", identifier_filename);
     
+    if (identifier_filename != nullptr)
+      {
+        setIdentifierFileName(identifier_filename);
+        identifierExchangeFunction = exchangeViaSharedFiles;
+      }
+
     if (identifierExchangeFunction == nullptr)
       {
         if (exchangeViaStdIO(mode==SEND_MODE,
@@ -913,6 +909,8 @@ PYBIND11_MODULE(rdma_transport, m) {
     .def("pollRequests",            &RdmaTransport::pollRequests)
     .def("waitRequestsCompletion",  &RdmaTransport::waitRequestsCompletion)
     .def("issueRequests",           &RdmaTransport::issueRequests)
+    .def("setupRdma",               &RdmaTransport::setupRdma)
+    
     .def("say_hello",               &RdmaTransport::say_hello)
     .def("addition",                &RdmaTransport::addition)
     .def("get_memoryview",          &RdmaTransport::get_memoryview);
