@@ -32,7 +32,8 @@ struct RdmaTransport {
   int gidIndex = -1; /* preferred gid index or -1 for no preference */
   char* identifierFileName = nullptr; /* default to using stdio for exchanging RDMA identifiers */
   //char identifierFileName[1024]; /* default to using stdio for exchanging RDMA identifiers */
-  char identifier_filename[1024] = {'0'};
+  //char identifier_filename[1024] = {'0'};
+  //char *identifier_filename; //[1024] = {'0'};
   char* metricURL = nullptr; /* default to not push metrics */
   uint32_t numMetricAveraging = 0; /* number of message completions over which to average metrics, default to numMemoryBlocks*numContiguousMessages */
 
@@ -122,9 +123,15 @@ struct RdmaTransport {
     metricURL(_metricURL),
     numMetricAveraging(_numMetricAveraging)   
   {
-    strncpy(identifier_filename, identifierFileName, 1024);
+    fprintf(stdout, "DID we get the newer version???\n");
+    //fprintf(stdout, "identifier file name is %s\n", identifier_filename);
+
+    //strncpy(identifier_filename, identifierFileName, 1024);
+    //strcpy(identifier_filename, identifierFileName);
+
+    fprintf(stdout, "DID we get the newer version???\n");
+    //fprintf(stdout, "identifier file name is %s\n", identifier_filename);
     
-    fprintf(stdout, "identifier file name is %s\n", identifier_filename);
     if (numTotalMessages == 0)
       numTotalMessages = numMemoryBlocks * numContiguousMessages;
     if (numMetricAveraging == 0)
@@ -253,25 +260,25 @@ struct RdmaTransport {
 
   void setupRdma()
   {
-    fprintf(stdout, "identifier file name is %s\n", identifier_filename);
-
-    /* We either exchange information with shared file or with messages, no stdio anymore */ 
-    if (identifier_filename != nullptr)
-      {
-        setIdentifierFileName(identifier_filename);
-	
-    	fprintf(stdout, "I am here???\n");
-    	if (exchangeViaSharedFiles(mode==SEND_MODE,
-				   packetSequenceNumber, queuePairNumber, gidAddress, localIdentifier,
-				   &remotePSN, &remoteQPN, &remoteGID, &remoteLID) != EXCH_SUCCESS)
-    	  {
-    	    //logger(LOG_CRIT, "Unable to exchange identifiers via provided exchange function");
-    	    //exit(FAILURE);
-    	    fprintf(stderr, "ERR:\tUnable to exchange identifiers via provided exchange function\n");
-    	    throw std::runtime_error("ERR:\tUnable to exchange identifiers via provided exchange function\n");
-    	  }
-	
-      }
+    //fprintf(stdout, "identifier file name is %s\n", identifier_filename);
+    
+    ///* We either exchange information with shared file or with messages, no stdio anymore */ 
+    //if (identifier_filename != nullptr)
+    //  {
+    //    setIdentifierFileName(identifier_filename);
+    //	
+    //	fprintf(stdout, "I am here???\n");
+    //	if (exchangeViaSharedFiles(mode==SEND_MODE,
+    //				   packetSequenceNumber, queuePairNumber, gidAddress, localIdentifier,
+    //				   &remotePSN, &remoteQPN, &remoteGID, &remoteLID) != EXCH_SUCCESS)
+    //	  {
+    //	    //logger(LOG_CRIT, "Unable to exchange identifiers via provided exchange function");
+    //	    //exit(FAILURE);
+    //	    fprintf(stderr, "ERR:\tUnable to exchange identifiers via provided exchange function\n");
+    //	    throw std::runtime_error("ERR:\tUnable to exchange identifiers via provided exchange function\n");
+    //	  }
+    //	
+    //  }
   
     /* modify the queue pair to be ready to receive and possibly send */
     if (modifyQueuePairReady(queuePair, rdmaPort, gidIndex, mode, packetSequenceNumber,
@@ -350,46 +357,46 @@ struct RdmaTransport {
     fprintf(stdout, "DEBUG:\tCompletions setup done\n");
   }
 
-  uint32_t getPacketSequenceNumber()
-  {
-    return packetSequenceNumber;
-  }
-  
-  uint32_t getQueuePairNumber()
-  {
-    return queuePairNumber;
-  }
-  
-  uint16_t getLocalIdentifier()
-  {
-    return localIdentifier;
-  }
+  //uint32_t getPacketSequenceNumber()
+  //{
+  //  return packetSequenceNumber;
+  //}
+  //
+  //uint32_t getQueuePairNumber()
+  //{
+  //  return queuePairNumber;
+  //}
+  //
+  //uint16_t getLocalIdentifier()
+  //{
+  //  return localIdentifier;
+  //}
 
-  void setPacketSequenceNumber(uint32_t _remotePSN)
-  {
-    remotePSN = _remotePSN;
-  }
-  
-  void setQueuePairNumber(uint32_t _remoteQPN)
-  {
-    remoteQPN = _remoteQPN;
-  }
-  
-  void setLocalIdentifier(uint16_t _remoteLID)
-  {
-    remoteLID = _remoteLID;
-  }
-
-  void setGidAddress(py::array_t<uint8_t>& _remoteGID_raw)
-  {
-    py::buffer_info remoteGID_raw = _remoteGID_raw.request();
-
-    uint8_t* ptr = (uint8_t*)remoteGID_raw.ptr;
-    
-    for(int i = 0; i < 16; i++){
-      remoteGID.raw[i] = ptr[i];
-    }
-  }
+  //void setPacketSequenceNumber(uint32_t _remotePSN)
+  //{
+  //  remotePSN = _remotePSN;
+  //}
+  //
+  //void setQueuePairNumber(uint32_t _remoteQPN)
+  //{
+  //  remoteQPN = _remoteQPN;
+  //}
+  //
+  //void setLocalIdentifier(uint16_t _remoteLID)
+  //{
+  //  remoteLID = _remoteLID;
+  //}
+  //
+  //void setGidAddress(py::array_t<uint8_t>& _remoteGID_raw)
+  //{
+  //  py::buffer_info remoteGID_raw = _remoteGID_raw.request();
+  //
+  //  uint8_t* ptr = (uint8_t*)remoteGID_raw.ptr;
+  //  
+  //  for(int i = 0; i < 16; i++){
+  //    remoteGID.raw[i] = ptr[i];
+  //  }
+  //}
 
   void setupRequests()
   {
@@ -537,10 +544,10 @@ struct RdmaTransport {
     //  }
 
     setAllMemoryRegionsEnqueued(manager, false); 
-    if (metricURL != nullptr)
-      {
-	initialiseMetricReporter();
-      }
+    //if (metricURL != nullptr)
+    //  {
+    //	initialiseMetricReporter();
+    //  }
     currentQueueLoading = 0; /* no work requests initially in queue */
     numWorkRequestsEnqueued = 0;
     previousImmediateData = UINT32_MAX;
@@ -558,9 +565,9 @@ struct RdmaTransport {
     metricMessagesTransferred = 0;
     metricWorkRequestsMissing = 0;
   
-    /* initialise sender metrics */
-    metricStartClockTime = clock();
-    gettimeofday(&metricStartWallTime, nullptr);
+    ///* initialise sender metrics */
+    //metricStartClockTime = clock();
+    //gettimeofday(&metricStartWallTime, nullptr);
   }
 
   /*
@@ -773,10 +780,10 @@ struct RdmaTransport {
         displayMemoryBlocks(manager, 10, 10); /* display contents that were received */
       }
 
-    if ((char *)metricURL != nullptr)
-      {
-        cleanupMetricReporter();
-      }
+    //if ((char *)metricURL != nullptr)
+    //  {
+    //    cleanupMetricReporter();
+    //  }
 
     deregisterMemoryRegions(manager);
 
@@ -825,12 +832,12 @@ struct RdmaTransport {
                                        );
   }
   
-  py::memoryview getGidAddress() {    
-    return py::memoryview::from_memory(
-                                       gidAddress.raw, // pointer
-                                       sizeof(gidAddress.raw)  // size
-                                       );
-  }
+  //py::memoryview getGidAddress() {    
+  //  return py::memoryview::from_memory(
+  //                                     gidAddress.raw, // pointer
+  //                                     sizeof(gidAddress.raw)  // size
+  //                                     );
+  //}
 };
 
 PYBIND11_MODULE(rdma_transport, m) {
@@ -902,15 +909,15 @@ PYBIND11_MODULE(rdma_transport, m) {
     //.def_readwrite("receiveCompletionQueue", &RdmaTransport::receiveCompletionQueue)
 
     
-    .def("getPacketSequenceNumber", &RdmaTransport::getPacketSequenceNumber)
-    .def("getQueuePairNumber",      &RdmaTransport::getQueuePairNumber)
-    .def("getGidAddress",           &RdmaTransport::getGidAddress)
-    .def("getLocalIdentifier",      &RdmaTransport::getLocalIdentifier)
+    //.def("getPacketSequenceNumber", &RdmaTransport::getPacketSequenceNumber)
+    //.def("getQueuePairNumber",      &RdmaTransport::getQueuePairNumber)
+    //.def("getGidAddress",           &RdmaTransport::getGidAddress)
+    //.def("getLocalIdentifier",      &RdmaTransport::getLocalIdentifier)
 
-    .def("setPacketSequenceNumber", &RdmaTransport::setPacketSequenceNumber)
-    .def("setQueuePairNumber",      &RdmaTransport::setQueuePairNumber)
-    .def("setGidAddress",           &RdmaTransport::setGidAddress)
-    .def("setLocalIdentifier",      &RdmaTransport::setLocalIdentifier)
+    //.def("setPacketSequenceNumber", &RdmaTransport::setPacketSequenceNumber)
+    //.def("setQueuePairNumber",      &RdmaTransport::setQueuePairNumber)
+    //.def("setGidAddress",           &RdmaTransport::setGidAddress)
+    //.def("setLocalIdentifier",      &RdmaTransport::setLocalIdentifier)
     
     .def("get_numCompletionsFound", &RdmaTransport::get_numCompletionsFound)
     .def("get_workCompletions",     &RdmaTransport::get_workCompletions)    
