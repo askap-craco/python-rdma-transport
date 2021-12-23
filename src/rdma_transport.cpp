@@ -357,46 +357,46 @@ struct RdmaTransport {
     fprintf(stdout, "DEBUG:\tCompletions setup done\n");
   }
 
-  //uint32_t getPacketSequenceNumber()
-  //{
-  //  return packetSequenceNumber;
-  //}
-  //
-  //uint32_t getQueuePairNumber()
-  //{
-  //  return queuePairNumber;
-  //}
-  //
-  //uint16_t getLocalIdentifier()
-  //{
-  //  return localIdentifier;
-  //}
+  uint32_t getPacketSequenceNumber()
+  {
+    return packetSequenceNumber;
+  }
+  
+  uint32_t getQueuePairNumber()
+  {
+    return queuePairNumber;
+  }
+  
+  uint16_t getLocalIdentifier()
+  {
+    return localIdentifier;
+  }
 
-  //void setPacketSequenceNumber(uint32_t _remotePSN)
-  //{
-  //  remotePSN = _remotePSN;
-  //}
-  //
-  //void setQueuePairNumber(uint32_t _remoteQPN)
-  //{
-  //  remoteQPN = _remoteQPN;
-  //}
-  //
-  //void setLocalIdentifier(uint16_t _remoteLID)
-  //{
-  //  remoteLID = _remoteLID;
-  //}
-  //
-  //void setGidAddress(py::array_t<uint8_t>& _remoteGID_raw)
-  //{
-  //  py::buffer_info remoteGID_raw = _remoteGID_raw.request();
-  //
-  //  uint8_t* ptr = (uint8_t*)remoteGID_raw.ptr;
-  //  
-  //  for(int i = 0; i < 16; i++){
-  //    remoteGID.raw[i] = ptr[i];
-  //  }
-  //}
+  void setPacketSequenceNumber(uint32_t _remotePSN)
+  {
+    remotePSN = _remotePSN;
+  }
+  
+  void setQueuePairNumber(uint32_t _remoteQPN)
+  {
+    remoteQPN = _remoteQPN;
+  }
+  
+  void setLocalIdentifier(uint16_t _remoteLID)
+  {
+    remoteLID = _remoteLID;
+  }
+  
+  void setGidAddress(py::array_t<uint8_t>& _remoteGID_raw)
+  {
+    py::buffer_info remoteGID_raw = _remoteGID_raw.request();
+  
+    uint8_t* ptr = (uint8_t*)remoteGID_raw.ptr;
+    
+    for(int i = 0; i < 16; i++){
+      remoteGID.raw[i] = ptr[i];
+    }
+  }
 
   void setupRequests()
   {
@@ -832,12 +832,12 @@ struct RdmaTransport {
                                        );
   }
   
-  //py::memoryview getGidAddress() {    
-  //  return py::memoryview::from_memory(
-  //                                     gidAddress.raw, // pointer
-  //                                     sizeof(gidAddress.raw)  // size
-  //                                     );
-  //}
+  py::memoryview getGidAddress() {    
+    return py::memoryview::from_memory(
+                                       gidAddress.raw, // pointer
+                                       sizeof(gidAddress.raw)  // size
+                                       );
+  }
 };
 
 PYBIND11_MODULE(rdma_transport, m) {
@@ -907,17 +907,16 @@ PYBIND11_MODULE(rdma_transport, m) {
     //.def_readonly("numCompletionsFound", &RdmaTransport::numCompletionsFound)
     //.def_readwrite("sendCompletionQueue", &RdmaTransport::sendCompletionQueue)
     //.def_readwrite("receiveCompletionQueue", &RdmaTransport::receiveCompletionQueue)
-
     
-    //.def("getPacketSequenceNumber", &RdmaTransport::getPacketSequenceNumber)
-    //.def("getQueuePairNumber",      &RdmaTransport::getQueuePairNumber)
-    //.def("getGidAddress",           &RdmaTransport::getGidAddress)
-    //.def("getLocalIdentifier",      &RdmaTransport::getLocalIdentifier)
+    .def("getPacketSequenceNumber", &RdmaTransport::getPacketSequenceNumber)
+    .def("getQueuePairNumber",      &RdmaTransport::getQueuePairNumber)
+    .def("getGidAddress",           &RdmaTransport::getGidAddress)
+    .def("getLocalIdentifier",      &RdmaTransport::getLocalIdentifier)
 
-    //.def("setPacketSequenceNumber", &RdmaTransport::setPacketSequenceNumber)
-    //.def("setQueuePairNumber",      &RdmaTransport::setQueuePairNumber)
-    //.def("setGidAddress",           &RdmaTransport::setGidAddress)
-    //.def("setLocalIdentifier",      &RdmaTransport::setLocalIdentifier)
+    .def("setPacketSequenceNumber", &RdmaTransport::setPacketSequenceNumber)
+    .def("setQueuePairNumber",      &RdmaTransport::setQueuePairNumber)
+    .def("setGidAddress",           &RdmaTransport::setGidAddress)
+    .def("setLocalIdentifier",      &RdmaTransport::setLocalIdentifier)
     
     .def("get_numCompletionsFound", &RdmaTransport::get_numCompletionsFound)
     .def("get_workCompletions",     &RdmaTransport::get_workCompletions)    
