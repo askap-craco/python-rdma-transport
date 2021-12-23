@@ -30,7 +30,7 @@ struct RdmaTransport {
   char* rdmaDeviceName = nullptr; /* no preferred rdma device name to choose */
   uint8_t rdmaPort = 1;
   int gidIndex = -1; /* preferred gid index or -1 for no preference */
-  const char* identifierFileName = nullptr; /* default to using stdio for exchanging RDMA identifiers */
+  //const char* identifierFileName = nullptr; /* default to using stdio for exchanging RDMA identifiers */
   //char identifierFileName[1024]; /* default to using stdio for exchanging RDMA identifiers */
   //char identifier_filename[1024] = {'0'};
   //char *identifier_filename; //[1024] = {'0'};
@@ -105,7 +105,7 @@ struct RdmaTransport {
 		char* _rdmaDeviceName,
 		uint8_t _rdmaPort,
 		int _gidIndex,
-		const char* _identifierFileName,
+		//const char* _identifierFileName,
 		char* _metricURL,
 		uint32_t _numMetricAveraging) :
     requestLogLevel(_requestLogLevel),
@@ -119,12 +119,12 @@ struct RdmaTransport {
     rdmaDeviceName(_rdmaDeviceName),
     rdmaPort(_rdmaPort),
     gidIndex(_gidIndex),
-    identifierFileName(_identifierFileName),
+    //identifierFileName(_identifierFileName),
     metricURL(_metricURL),
     numMetricAveraging(_numMetricAveraging)   
   {
     fprintf(stdout, "DID we get the newer version???\n");
-    fprintf(stdout, "identifier file name is %s\n", identifierFileName);
+    //fprintf(stdout, "identifier file name is %s\n", identifierFileName);
 
     //strncpy(identifier_filename, identifierFileName, 1024);
     //strcpy(identifier_filename, identifierFileName);
@@ -258,7 +258,7 @@ struct RdmaTransport {
     queuePairNumber = queuePair->qp_num;
   }
 
-  void setupRdma()
+  void setupRdma(const char* identifierFileName)
   {
     fprintf(stdout, "identifier file name is %s\n", identifierFileName);
     
@@ -900,7 +900,7 @@ PYBIND11_MODULE(rdma_transport, m) {
 	 char*,
 	 uint8_t, 
 	 int, 
-	 char*,
+	 //char*,
 	 char*,
 	 uint32_t>())
 
