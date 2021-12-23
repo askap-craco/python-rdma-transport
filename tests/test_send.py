@@ -54,7 +54,7 @@ def test_send_messages():
     # This should be after get local numbers
     # and setup remote numbers
     rdma_transport.setupRdma()
-
+    
     rdma_transport.issueRequests()
     print("issue requests done")
     

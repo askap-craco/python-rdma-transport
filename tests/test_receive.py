@@ -67,7 +67,7 @@ def test_receive_messages():
     numCompletionsFound = rdma_transport.get_numCompletionsFound()
     print("got numCompletionsFound")
     
-    workCompletions = rdma_transport.get_workCompletions
+    workCompletions = rdma_transport.get_workCompletions()
     print("got workCompletions")
     
     print(f"Number of numCompletionsFound {numCompletionsFound}, and workCompletions {workCompletions}")

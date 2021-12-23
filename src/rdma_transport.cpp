@@ -30,7 +30,7 @@ struct RdmaTransport {
   char* rdmaDeviceName = nullptr; /* no preferred rdma device name to choose */
   uint8_t rdmaPort = 1;
   int gidIndex = -1; /* preferred gid index or -1 for no preference */
-  char* identifierFileName = nullptr; /* default to using stdio for exchanging RDMA identifiers */
+  const char* identifierFileName = nullptr; /* default to using stdio for exchanging RDMA identifiers */
   //char identifierFileName[1024]; /* default to using stdio for exchanging RDMA identifiers */
   //char identifier_filename[1024] = {'0'};
   //char *identifier_filename; //[1024] = {'0'};
@@ -105,7 +105,7 @@ struct RdmaTransport {
 		char* _rdmaDeviceName,
 		uint8_t _rdmaPort,
 		int _gidIndex,
-		char* _identifierFileName,
+		const char* _identifierFileName,
 		char* _metricURL,
 		uint32_t _numMetricAveraging) :
     requestLogLevel(_requestLogLevel),
@@ -124,7 +124,7 @@ struct RdmaTransport {
     numMetricAveraging(_numMetricAveraging)   
   {
     fprintf(stdout, "DID we get the newer version???\n");
-    //fprintf(stdout, "identifier file name is %s\n", identifier_filename);
+    fprintf(stdout, "identifier file name is %s\n", identifierFileName);
 
     //strncpy(identifier_filename, identifierFileName, 1024);
     //strcpy(identifier_filename, identifierFileName);
@@ -260,25 +260,26 @@ struct RdmaTransport {
 
   void setupRdma()
   {
-    //fprintf(stdout, "identifier file name is %s\n", identifier_filename);
+    fprintf(stdout, "identifier file name is %s\n", identifierFileName);
     
-    ///* We either exchange information with shared file or with messages, no stdio anymore */ 
+    /* We either exchange information with shared file or with messages, no stdio anymore */ 
     //if (identifier_filename != nullptr)
-    //  {
-    //    setIdentifierFileName(identifier_filename);
-    //	
-    //	fprintf(stdout, "I am here???\n");
-    //	if (exchangeViaSharedFiles(mode==SEND_MODE,
-    //				   packetSequenceNumber, queuePairNumber, gidAddress, localIdentifier,
-    //				   &remotePSN, &remoteQPN, &remoteGID, &remoteLID) != EXCH_SUCCESS)
-    //	  {
-    //	    //logger(LOG_CRIT, "Unable to exchange identifiers via provided exchange function");
-    //	    //exit(FAILURE);
-    //	    fprintf(stderr, "ERR:\tUnable to exchange identifiers via provided exchange function\n");
-    //	    throw std::runtime_error("ERR:\tUnable to exchange identifiers via provided exchange function\n");
-    //	  }
-    //	
-    //  }
+    if (identifierFileName != nullptr)
+      {
+        setIdentifierFileName(identifierFileName);
+    	
+    	fprintf(stdout, "I am here???\n");
+    	if (exchangeViaSharedFiles(mode==SEND_MODE,
+    				   packetSequenceNumber, queuePairNumber, gidAddress, localIdentifier,
+    				   &remotePSN, &remoteQPN, &remoteGID, &remoteLID) != EXCH_SUCCESS)
+    	  {
+    	    //logger(LOG_CRIT, "Unable to exchange identifiers via provided exchange function");
+    	    //exit(FAILURE);
+    	    fprintf(stderr, "ERR:\tUnable to exchange identifiers via provided exchange function\n");
+    	    throw std::runtime_error("ERR:\tUnable to exchange identifiers via provided exchange function\n");
+    	  }
+    	
+      }
   
     /* modify the queue pair to be ready to receive and possibly send */
     if (modifyQueuePairReady(queuePair, rdmaPort, gidIndex, mode, packetSequenceNumber,
