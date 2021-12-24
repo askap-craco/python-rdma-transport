@@ -544,7 +544,7 @@ struct RdmaTransport {
     //	exit(FAILURE);
     //  }
 
-    setAllMemoryRegionsEnqueued(manager, false); 
+    //setAllMemoryRegionsEnqueued(manager, false); 
     //if (metricURL != nullptr)
     //  {
     //	initialiseMetricReporter();
@@ -605,7 +605,7 @@ struct RdmaTransport {
 		  }
                 currentQueueLoading += manager->numContiguousMessages;
                 numWorkRequestsEnqueued += manager->numContiguousMessages;
-                setMemoryRegionEnqueued(manager, regionIndex, true);
+                //setMemoryRegionEnqueued(manager, regionIndex, true);
                 regionIndex++;
                 if (regionIndex >= manager->numMemoryRegions)
 		  regionIndex = 0;
@@ -645,7 +645,7 @@ struct RdmaTransport {
 		  }
                 currentQueueLoading += manager->numContiguousMessages;
                 numWorkRequestsEnqueued += manager->numContiguousMessages;
-                setMemoryRegionEnqueued(manager, regionIndex, true);
+                //setMemoryRegionEnqueued(manager, regionIndex, true);
                 regionIndex++;
                 if (regionIndex >= manager->numMemoryRegions)
 		  regionIndex = 0;
@@ -730,11 +730,13 @@ struct RdmaTransport {
       {
 	fprintf(stdout, "DEBUG:\twait for completions done\n");
       }
+
+    fprintf(stdout, "Lost, where am i???\n");
   }
   
   void pollRequests()
   {
-    fprintf(stdout, "DEBUG:\tpoll requests now\n");
+    //fprintf(stdout, "DEBUG:\tpoll requests now\n");
     
     numCompletionsFound = 0;
     workCompletions.resize(maxWorkRequestDequeue);
@@ -744,20 +746,121 @@ struct RdmaTransport {
       {
 	// We do not need to reset the size here as the size will be returned seperately as numCompletionsFound
 	numCompletionsFound = ibv_poll_cq(receiveCompletionQueue, maxWorkRequestDequeue, workCompletions.data());
+
+	if (numCompletionsFound < 0)
+	  {
+	    logger(LOG_WARNING, "Receiver failed to poll for work completions");
+	  }
+	else
+	  {
+	    logger(LOG_INFO, "Receiver has polled %d work completions", numCompletionsFound);
+	    for (int wcIndex=0; wcIndex<numCompletionsFound; wcIndex++)
+	      {
+		struct ibv_wc workCompletion = workCompletions[wcIndex];
+		bool hasImmediateData = (workCompletion.wc_flags & IBV_WC_WITH_IMM) != 0;
+		uint32_t immediateData = ntohl(workCompletion.imm_data);
+		if (workCompletion.status != IBV_WC_SUCCESS)
+		  {
+		    logger(LOG_ERR,
+			   "Receiver work completion error with status:%d, id:%" PRIu64
+			   ", imm_data:%" PRIu32 ", syndrome:0x%x",
+			   workCompletion.status, workCompletion.wr_id, immediateData,
+			   workCompletion.vendor_err);
+		  }
+		else
+		  {
+		    uint32_t transferredRegionIndex = (uint32_t)(workCompletion.wr_id / manager->numContiguousMessages);
+		    uint32_t transferredContiguousIndex = (uint32_t)(workCompletion.wr_id % manager->numContiguousMessages);
+		    //setMemoryRegionEnqueued(manager, transferredRegionIndex, false); /* note this gets reset for each of the contiguous messages */
+		    //setMemoryRegionPopulated(manager, transferredRegionIndex, true); /* note typically now want to utilise the data and then unpopulate region */
+		    setMessageTransferred(manager, transferredRegionIndex, transferredContiguousIndex, numWorkRequestCompletions+numWorkRequestsMissing);
+		    logger(LOG_DEBUG,
+			   "Receiver work completion %" PRIu64 " success status with work request id %" PRIu64
+			   " and immediate data %" PRIu32, numWorkRequestCompletions + numWorkRequestsMissing,
+			   workCompletion.wr_id, immediateData);
+		  }
+		if (hasImmediateData)
+		  {
+		    /* check immediate data value is incrementing contiguously */
+		    if (immediateData == previousImmediateData)
+		      {
+			/* identical work completion immediate data values received */
+			logger(LOG_WARNING, "Receiver work completion %" PRIu64 " immediate data %" PRIu32
+			       " duplicated from previous messages", numWorkRequestCompletions + numWorkRequestsMissing,
+			       immediateData);
+		      }
+		    else if (immediateData == previousImmediateData + (uint32_t)1) /* unsigned arithmetic with wraparound at UINT32_MAX */
+		      {
+			/* immediateData has been incremented by one (possibly with wrap around) as expected */
+		      }
+		    else // if (immediateData - previousImmediateData > 1u) /* unsigned arithmetic with wraparound at UINT32_MAX */
+		      {
+			/* there are missing work completions */
+			uint32_t numMissingFound = immediateData - (previousImmediateData+1u);
+			numWorkRequestsMissing += numMissingFound;
+			metricWorkRequestsMissing += numMissingFound;
+			logger(LOG_WARNING, "Receiver detected missing %" PRIu32
+			       " message(s) while receiving work completion %" PRIu64,
+			       numMissingFound, numWorkRequestCompletions + numWorkRequestsMissing);
+		      }
+		    previousImmediateData = immediateData;
+		  }
+		currentQueueLoading--;
+		numWorkRequestCompletions++;
+		metricMessagesTransferred++;
+	      }
+	  }
+	//setAllMemoryRegionsPopulated(manager, false);
       }
     else
       {
 	// We do not need to reset the size here as the size will be returned seperately as numCompletionsFound
 	numCompletionsFound = ibv_poll_cq(sendCompletionQueue, maxWorkRequestDequeue, workCompletions.data());
+	if (numCompletionsFound < 0)
+	  {
+	    logger(LOG_WARNING, "Sender failed to poll for work completions"); 
+	  }
+	else
+	  {
+	    logger(LOG_INFO, "Sender has polled %d work completions", numCompletionsFound);
+	    for (int wcIndex=0; wcIndex<numCompletionsFound; wcIndex++)
+	      {
+		struct ibv_wc workCompletion = workCompletions[wcIndex];
+		if (workCompletion.status != IBV_WC_SUCCESS)
+		  {
+		    logger(LOG_ERR,
+			   "Sender work completion error with status:%d, id:%" PRIu64 ", imm_data:%" PRIu32 ", syndrome:0x%x",
+			   workCompletion.status, workCompletion.wr_id, workCompletion.imm_data, workCompletion.vendor_err);
+		  }
+		else
+		  {
+		    /* note imm_data seems to not appear in sender's workCompletion */
+		    uint32_t transferredRegionIndex = (uint32_t)(workCompletion.wr_id / manager->numContiguousMessages);
+		    uint32_t transferredContiguousIndex = (uint32_t)(workCompletion.wr_id % manager->numContiguousMessages);
+		    //setMemoryRegionEnqueued(manager, transferredRegionIndex, false);
+		    /* set memory region to be unpopulated so can be repopulated with further data */
+		    //setMemoryRegionPopulated(manager, transferredRegionIndex, false);
+		    setMessageTransferred(manager, transferredRegionIndex, transferredContiguousIndex, numWorkRequestCompletions);
+		    logger(LOG_DEBUG,
+			   "Sender work completion %" PRIu64 " success status with work request id %" PRIu64,
+			   numWorkRequestCompletions, workCompletion.wr_id);
+		  }
+		currentQueueLoading--;
+		numWorkRequestCompletions++;
+		metricMessagesTransferred++;
+	      }
+	    //setAllMemoryRegionsPopulated(manager, false);
+	  }	
       }
+    
   }
-
+  
   // Easy way to get class member
   int get_numCompletionsFound()
   {
     return numCompletionsFound;
   }
-
+  
   // A easy way to get a vector of struct from python
   std::vector<struct ibv_wc> get_workCompletions()
   {
