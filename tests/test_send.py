@@ -6,8 +6,6 @@ import numpy as np
 import time
 
 def test_send_messages():
-    nrepeat = 2
-    
     # From the C sources aboutmaxIlinedadtaSize
     # must be zero NOTE put back at 236 once testing completed
     requestLogLevel = logType.LOG_NOTICE
@@ -16,7 +14,7 @@ def test_send_messages():
     numMemoryBlocks = 10
     numContiguousMessages = 100
     dataFileName = None
-    numTotalMessages = nrepeat*(numMemoryBlocks*numContiguousMessages)
+    numTotalMessages = 10*numMemoryBlocks*numContiguousMessages
     messageDelayTime = 100
     rdmaDeviceName = None #"mlx5_1"
     rdmaPort = 1
@@ -58,7 +56,8 @@ def test_send_messages():
     # and setup remote numbers
     rdma_transport.setupRdma(identifierFileName)
 
-    for i in range(nrepeat):
+    numCompletionsTotal = 0
+    while numCompletionsTotal < numTotalMessages:
         rdma_transport.issueRequests()
         print("issue requests done")
         
@@ -70,6 +69,9 @@ def test_send_messages():
         
         numCompletionsFound = rdma_transport.get_numCompletionsFound()
         print("got numCompletionsFound")
+
+        # Record how many completions got so far
+        numCompletionsTotal += numCompletionsFound
         
         workCompletions = rdma_transport.get_workCompletions
         print("got workCompletions")
@@ -80,7 +82,7 @@ def test_send_messages():
         
         print(f"Number of numCompletionsFound {numCompletionsFound}, and workCompletions {workCompletions} with first {ndata_print} data\n {rdma_buffer[0:ndata_print]}")
 
-        time.sleep(10)
+        #time.sleep(10)
         
 if __name__ == '__main__':
     test_send_messages()

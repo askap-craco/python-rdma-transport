@@ -6,8 +6,6 @@ import numpy as np
 import time
 
 def test_receive_messages():
-    nrepeat = 2
-    
     # From the C sources aboutmaxIlinedadtaSize
     # must be zero NOTE put back at 236 once testing completed
     requestLogLevel = logType.LOG_DEBUG
@@ -16,7 +14,7 @@ def test_receive_messages():
     numMemoryBlocks = 10
     numContiguousMessages = 100
     dataFileName = None
-    numTotalMessages = nrepeat*(numMemoryBlocks*numContiguousMessages)
+    numTotalMessages = numMemoryBlocks*numContiguousMessages
     messageDelayTime = 0
     rdmaDeviceName = None #"mlx5_1"
     rdmaPort = 1
@@ -57,8 +55,10 @@ def test_receive_messages():
     # This should be after get local numbers
     # and setup remote numbers
     rdma_transport.setupRdma(identifierFileName)
-
-    for i in range(nrepeat):
+        
+    numCompletionsTotal = 0
+    while numCompletionsTotal < numTotalMessages:
+    #for i in range(2):
         rdma_transport.issueRequests()
         print("issue requests done")
         
@@ -70,6 +70,8 @@ def test_receive_messages():
         
         numCompletionsFound = rdma_transport.get_numCompletionsFound()
         print("got numCompletionsFound")
+
+        numCompletionsTotal += numCompletionsFound
         
         workCompletions = rdma_transport.get_workCompletions()
         print("got workCompletions")
