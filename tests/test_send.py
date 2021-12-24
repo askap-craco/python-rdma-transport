@@ -14,7 +14,7 @@ def test_send_messages():
     numMemoryBlocks = 10
     numContiguousMessages = 100
     dataFileName = None
-    numTotalMessages = 10*numMemoryBlocks*numContiguousMessages
+    numTotalMessages = 10*numMemoryBlocks*numContiguousMessages-1
     messageDelayTime = 100
     rdmaDeviceName = None #"mlx5_1"
     rdmaPort = 1

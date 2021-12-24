@@ -14,7 +14,7 @@ def test_receive_messages():
     numMemoryBlocks = 10
     numContiguousMessages = 100
     dataFileName = None
-    numTotalMessages = 10*numMemoryBlocks*numContiguousMessages
+    numTotalMessages = 10*numMemoryBlocks*numContiguousMessages-1
     messageDelayTime = 0
     rdmaDeviceName = None #"mlx5_1"
     rdmaPort = 1
