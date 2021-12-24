@@ -14,7 +14,7 @@ def test_receive_messages():
     numMemoryBlocks = 10
     numContiguousMessages = 100
     dataFileName = None
-    numTotalMessages = numMemoryBlocks*numContiguousMessages
+    numTotalMessages = 10*numMemoryBlocks*numContiguousMessages
     messageDelayTime = 0
     rdmaDeviceName = None #"mlx5_1"
     rdmaPort = 1
@@ -80,7 +80,7 @@ def test_receive_messages():
         rdma_memory = rdma_transport.get_memoryview(0)
         rdma_buffer = np.frombuffer(rdma_memory, dtype=np.int16)
         
-        print(f"Number of numCompletionsFound {numCompletionsFound}, and workCompletions {workCompletions} with first {ndata_print} data\n {rdma_buffer[0:ndata_print]}")
+        #print(f"Number of numCompletionsFound {numCompletionsFound}, and workCompletions {workCompletions} with first {ndata_print} data\n {rdma_buffer[0:ndata_print]}")
     
 if __name__ == '__main__':
     test_receive_messages()
