@@ -17,19 +17,15 @@ struct RdmaTransport {
     set up default values that might be overriden when creating a instance of the class 
     these setups are from outside
   */
-  enum logType requestLogLevel = LOG_NOTICE;
   enum runMode mode = RECV_MODE;
   uint32_t messageSize = 65536; /* size in bytes of single RDMA message */
   uint32_t numMemoryBlocks = 1; /* number of memory blocks to allocate for RDMA messages */
   uint32_t numContiguousMessages = 1; /* number of contiguous messages to hold in each memory block */
-  char* dataFileName = nullptr; /* default to not loading (sender) nor saving (receiver) to file the data memory blocks */
   uint64_t numTotalMessages = 0; /* total number of messages to send or receive, if 0 then default to numMemoryBlocks*numContiguousMessages */
   uint32_t messageDelayTime = 0; /* time in milliseconds to delay after each message send/receive posted, default is no delay */
   char* rdmaDeviceName = nullptr; /* no preferred rdma device name to choose */
   uint8_t rdmaPort = 1;
   int gidIndex = -1; /* preferred gid index or -1 for no preference */
-  char* metricURL = nullptr; /* default to not push metrics */
-  uint32_t numMetricAveraging = 0; /* number of message completions over which to average metrics, default to numMemoryBlocks*numContiguousMessages */
 
   /* setup when class instance is created */
   struct ibv_context *rdmaDeviceContext;
@@ -57,15 +53,9 @@ struct RdmaTransport {
   uint32_t regionIndex = 0;
   uint64_t numWorkRequestCompletions = 0;
 
-  /* initialise receiver metrics */
-  uint64_t metricMessagesTransferred = 0;
-  clock_t metricStartClockTime = -1;
-  uint64_t metricWorkRequestsMissing = 0;
-  
   /* initialise sender metrics */
   struct ibv_recv_wr *badReceiveRequest = nullptr;
   struct ibv_send_wr *badSendRequest = nullptr;
-  struct timeval metricStartWallTime;
 
   /* These two will be accessed outside*/
   int numCompletionsFound;
@@ -89,39 +79,28 @@ struct RdmaTransport {
   
   enum ibv_mtu mtu;
   
-  RdmaTransport(enum logType _requestLogLevel,
-		enum runMode _mode,
+  RdmaTransport(enum runMode _mode,
 		uint32_t _messageSize,
 		uint32_t _numMemoryBlocks,
 		uint32_t _numContiguousMessages,
-		char*_dataFileName,
 		uint64_t _numTotalMessages,
 		uint32_t _messageDelayTime,
 		char* _rdmaDeviceName,
 		uint8_t _rdmaPort,
-		int _gidIndex,
-		char* _metricURL,
-		uint32_t _numMetricAveraging) :
-    requestLogLevel(_requestLogLevel),
+		int _gidIndex) :
     mode(_mode),
     messageSize(_messageSize),
     numMemoryBlocks(_numMemoryBlocks),
     numContiguousMessages(_numContiguousMessages),
-    dataFileName(_dataFileName),
     numTotalMessages(_numTotalMessages),
     messageDelayTime(_messageDelayTime),
     rdmaDeviceName(_rdmaDeviceName),
     rdmaPort(_rdmaPort),
-    gidIndex(_gidIndex),
-    metricURL(_metricURL),
-    numMetricAveraging(_numMetricAveraging)   
+    gidIndex(_gidIndex)
   {
     if (numTotalMessages == 0)
       numTotalMessages = numMemoryBlocks * numContiguousMessages;
-    if (numMetricAveraging == 0)
-      numMetricAveraging = numMemoryBlocks * numContiguousMessages;
-    setLogLevel(requestLogLevel);
-
+    
     if (mode == RECV_MODE)
       {
 	fprintf(stdout, "INFO:\tReceive Visibilities starting as receiver\n");
@@ -153,32 +132,18 @@ struct RdmaTransport {
       }
     else
       {
-        if (dataFileName != nullptr)
+	/* put something into each allocated memory block to test sending */
+	for (uint32_t blockIndex=0; blockIndex<numMemoryBlocks; blockIndex++)
 	  {
-            // read data from dataFileName.0, dataFileName.1, ... into memory blocks
-            if (!readFilesIntoMemoryBlocks(manager, dataFileName))
+	    for (uint64_t i=0; i<memoryBlockSize; i++)
 	      {
-		fprintf(stdout, "WARN:\tUnsuccessful read of data files\n");
+		((unsigned char*)memoryBlocks[blockIndex])[i]
+		  = (unsigned char)(i+(blockIndex*memoryBlockSize));
 	      }
 	  }
-        else
-	  {
-            /* put something into each allocated memory block to test sending */
-            for (uint32_t blockIndex=0; blockIndex<numMemoryBlocks; blockIndex++)
-	      {
-                for (uint64_t i=0; i<memoryBlockSize; i++)
-		  {
-                    ((unsigned char*)memoryBlocks[blockIndex])[i]
-		      = (unsigned char)(i+(blockIndex*memoryBlockSize));
-		  }
-	      }
-	  }
-        setAllMemoryRegionsPopulated(manager, true);
+	setAllMemoryRegionsPopulated(manager, true);
         //displayMemoryBlocks(manager, 10, 10); /* display contents that will send */
       }
-
-    if (numMetricAveraging == 0)
-      numMetricAveraging = manager->numMemoryRegions * manager->numContiguousMessages;
 
     fprintf(stdout, "INFO:\tReceive Visibilities starting");
     if (mode == RECV_MODE)
@@ -454,10 +419,6 @@ struct RdmaTransport {
     numWorkRequestsMissing = 0; /* determined by finding non-incrementing immediate data values */
     regionIndex = 0;
     numWorkRequestCompletions = 0;
-
-    /* initialise metrics */
-    metricMessagesTransferred = 0;
-    metricWorkRequestsMissing = 0;
   }
 
   /*
@@ -557,7 +518,6 @@ struct RdmaTransport {
   {    
     if (waitForCompletionQueueEvent() != SUCCESS)
       {
-	//logger(LOG_ERR, "Receiver unable to wait for completion notification");
 	fprintf(stderr, "ERR:\tunable to wait for completion notification\n");
 	throw std::runtime_error("ERR:\tunable to wait for completion notification\n");
       }
@@ -618,16 +578,14 @@ struct RdmaTransport {
 			/* there are missing work completions */
 			numMissingFound = immediateData - (previousImmediateData+1u);
 			numWorkRequestsMissing += numMissingFound;
-			metricWorkRequestsMissing += numMissingFound;
-			logger(LOG_WARNING, "Receiver detected missing %" PRIu32
-			       " message(s) while receiving work completion %" PRIu64,
-			       numMissingFound, numWorkRequestCompletions + numWorkRequestsMissing);
+			fprintf(stdout, "WARN:\tReceiver detected missing %" PRIu32
+				" message(s) while receiving work completion %" PRIu64,
+				numMissingFound, numWorkRequestCompletions + numWorkRequestsMissing);
 		      }
 		    previousImmediateData = immediateData;
 		  }
 		currentQueueLoading--;
 		numWorkRequestCompletions++;
-		metricMessagesTransferred++;
 	      }
 	  }
       }
@@ -661,7 +619,6 @@ struct RdmaTransport {
 		//  }
 		currentQueueLoading--;
 		numWorkRequestCompletions++;
-		metricMessagesTransferred++;
 	      }
 	  }	
       }
@@ -690,17 +647,9 @@ struct RdmaTransport {
     /* if in receive mode then display contents to stdio */
     if (mode == RECV_MODE)
       {
-        if ((char *)dataFileName != nullptr)
-    	  {
-            // write data to dataFileName.0, dataFileName.1, ... from memory blocks
-            if (!writeFilesFromMemoryBlocks(manager, dataFileName))
-    	      {
-		fprintf(stdout, "WARN:\tUnsuccessful write of data files\n");
-    	      }
-    	  }
         //displayMemoryBlocks(manager, 10, 10); /* display contents that were received */
       }
-
+    
     deregisterMemoryRegions(manager);
 
     cleanupRDMAResources(rdmaDeviceContext, eventChannel, protectionDomain,
@@ -772,18 +721,6 @@ PYBIND11_MODULE(rdma_transport, m) {
     .value("SEND_MODE", runMode{SEND_MODE})
     .export_values();
     
-  py::enum_<logType>(m, "logType")
-    .value("LOG_EMERG",   logType{LOG_EMERG})
-    .value("LOG_ALERT",   logType{LOG_ALERT})
-    .value("LOG_CRIT",    logType{LOG_CRIT})
-    .value("LOG_ERR",     logType{LOG_ERR})
-    .value("LOG_WARNING", logType{LOG_WARNING})
-    .value("LOG_NOTICE",  logType{LOG_NOTICE})
-    .value("LOG_INFO",    logType{LOG_INFO})
-    .value("LOG_DEBUG",   logType{LOG_DEBUG})
-    .export_values();
-
-
   // expose ibv_wc struct to python
   py::class_<ibv_wc>(m, "ibv_wc")
     .def_readonly("wr_id",          &ibv_wc::wr_id)
@@ -802,19 +739,15 @@ PYBIND11_MODULE(rdma_transport, m) {
     
   
   py::class_<RdmaTransport>(m, "RdmaTransport")
-    .def(py::init<enum logType,
-	 enum runMode,
+    .def(py::init<enum runMode,
 	 uint32_t, 
 	 uint32_t, 
 	 uint32_t, 
-	 char*, 
 	 uint64_t, 
 	 uint32_t, 
 	 char*,
 	 uint8_t, 
-	 int, 
-	 char*,
-	 uint32_t>())
+	 int>())
 
     .def("getPacketSequenceNumber", &RdmaTransport::getPacketSequenceNumber)
     .def("getQueuePairNumber",      &RdmaTransport::getQueuePairNumber)
