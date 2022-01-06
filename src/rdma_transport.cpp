@@ -579,7 +579,7 @@ struct RdmaTransport {
 			numMissingFound = immediateData - (previousImmediateData+1u);
 			numWorkRequestsMissing += numMissingFound;
 			fprintf(stdout, "WARN:\tReceiver detected missing %" PRIu32
-				" message(s) while receiving work completion %" PRIu64,
+				" message(s) while receiving work completion %" PRIu64"\n",
 				numMissingFound, numWorkRequestCompletions + numWorkRequestsMissing);
 		      }
 		    previousImmediateData = immediateData;

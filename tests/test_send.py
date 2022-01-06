@@ -1,6 +1,5 @@
 from rdma_transport import RdmaTransport
 from rdma_transport import runMode
-from rdma_transport import logType
 from rdma_transport import ibv_wc
 import numpy as np
 import time
@@ -8,37 +7,27 @@ import time
 def test_send_messages():
     # From the C sources aboutmaxIlinedadtaSize
     # must be zero NOTE put back at 236 once testing completed
-    requestLogLevel = logType.LOG_NOTICE
     mode = runMode.SEND_MODE
     messageSize = 65536
     numMemoryBlocks = 10
     numContiguousMessages = 100
-    dataFileName = None
     numTotalMessages = 10*numMemoryBlocks*numContiguousMessages-1
-    messageDelayTime = 100
+    messageDelayTime = 300
     rdmaDeviceName = None #"mlx5_1"
     rdmaPort = 1
     gidIndex = -1
-    #identifierFileName = None 
     identifierFileName = "exchange"
-    metricURL = None
-    numMetricAveraging = 0
   
-    rdma_transport = RdmaTransport(requestLogLevel, 
-                                   mode, 
+    rdma_transport = RdmaTransport(mode, 
                                    messageSize,
                                    numMemoryBlocks,
                                    numContiguousMessages,
-                                   dataFileName,
                                    numTotalMessages,
                                    messageDelayTime,
                                    rdmaDeviceName,
                                    rdmaPort,
-                                   gidIndex,
-                                   #identifierFileName,
-                                   metricURL,
-                                   numMetricAveraging)
-    
+                                   gidIndex)
+                                       
     packetSequenceNumber = rdma_transport.getPacketSequenceNumber()
     print(f"Local packet sequence number is {packetSequenceNumber}")
 
@@ -76,13 +65,13 @@ def test_send_messages():
         workCompletions = rdma_transport.get_workCompletions
         print("got workCompletions")
         
-        ndata_print = 10
-        rdma_memory = rdma_transport.get_memoryview(0)
-        rdma_buffer = np.frombuffer(rdma_memory, dtype=np.int16)
+        #ndata_print = 10
+        #rdma_memory = rdma_transport.get_memoryview(0)
+        #rdma_buffer = np.frombuffer(rdma_memory, dtype=np.int16)
         
         #print(f"Number of numCompletionsFound {numCompletionsFound}, and workCompletions {workCompletions} with first {ndata_print} data\n {rdma_buffer[0:ndata_print]}")
 
-        time.sleep(0.1)
+        #time.sleep(0.1)
         
 if __name__ == '__main__':
     test_send_messages()
