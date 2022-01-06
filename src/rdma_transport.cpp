@@ -75,6 +75,7 @@ struct RdmaTransport {
 
   /* These two will be accessed outside*/
   int numCompletionsFound;
+  uint32_t numMissingFound;
   std::vector<struct ibv_wc> workCompletions; // resize it in contructor
 
   /* these sgItems need to are setup in setupRequests */
@@ -193,7 +194,7 @@ struct RdmaTransport {
 	      }
 	  }
         setAllMemoryRegionsPopulated(manager, true);
-        displayMemoryBlocks(manager, 10, 10); /* display contents that will send */
+        //displayMemoryBlocks(manager, 10, 10); /* display contents that will send */
       }
 
     if (numMetricAveraging == 0)
@@ -226,10 +227,10 @@ struct RdmaTransport {
 	fprintf(stderr, "ERR:\tUnable to allocate the RDMA resources\n");
 	throw std::runtime_error( "ERR:\tUnable to allocate the RDMA resources");
       }
-    else
-      //logger(LOG_DEBUG, "RDMA resources allocated");
-      fprintf(stdout, "DEBUG:\tRDMA resources allocated\n");
-
+    //else
+    //  //logger(LOG_DEBUG, "RDMA resources allocated");
+    //  fprintf(stdout, "DEBUG:\tRDMA resources allocated\n");
+    
     /* set up the RDMA connection */
     //uint16_t localIdentifier;
     //union ibv_gid gidAddress;
@@ -243,10 +244,10 @@ struct RdmaTransport {
 	fprintf(stderr, "ERR:\tUnable to set up the RDMA connection\n");
 	throw std::runtime_error( "ERR:\tUnable to set up the RDMA connection");
       }
-    else
-      //logger(LOG_DEBUG, "RDMA connection set up");
-      fprintf(stdout, "DEBUG:\tRDMA connection set up\n");
-
+    //else
+    //  //logger(LOG_DEBUG, "RDMA connection set up");
+    //  fprintf(stdout, "DEBUG:\tRDMA connection set up\n");
+    
     //logger(LOG_INFO, "RDMA connection initialised on local %s", mode ? "sender" : "receiver");
     fprintf(stdout, "INFO:\tRDMA connection initialised on local %s", mode ? "sender" : "receiver\n");
 
@@ -291,10 +292,10 @@ struct RdmaTransport {
 	fprintf(stderr, "ERR:\tUnable to modify queue pair to be ready\n");
 	throw std::runtime_error("ERR:\tUnable to modify queue pair to be ready\n");
       }
-    else
-      //logger(LOG_DEBUG, "Queue pair modified to be ready");
-      fprintf(stdout, "DEBUG:\tQueue pair modified to be ready\n");
-
+    //else
+    //  //logger(LOG_DEBUG, "Queue pair modified to be ready");
+    //  fprintf(stdout, "DEBUG:\tQueue pair modified to be ready\n");
+    
     /* register memory blocks as memory regions for buffer */
     if (registerMemoryRegions(protectionDomain, manager) != SUCCESS)
       {
@@ -304,10 +305,10 @@ struct RdmaTransport {
 	fprintf(stderr, "ERR:\tUnable to allocate memory regions\n");
 	throw std::runtime_error("ERR:\tUnable to allocate memory regions\n");
       }
-    else
-      {
-	fprintf(stdout, "DEBUG:\tMemory regions registered\n");
-      }
+    //else
+    //  {
+    // fprintf(stdout, "DEBUG:\tMemory regions registered\n");
+    //  }
     
     /* perform the rdma data transfer */
     if (mode == RECV_MODE)
@@ -321,10 +322,10 @@ struct RdmaTransport {
 	    fprintf(stderr, "ERR:\tUnable to request receive completion queue notifications\n");
 	    throw std::runtime_error("ERR:\tUnable to request receive completion queue notifications\n");
 	  }
-	else
-	  {
-	    fprintf(stdout, "DEBUG:\tCompletion queue sent for receive\n");
-	  }
+	//else
+	//  {
+	//    fprintf(stdout, "DEBUG:\tCompletion queue sent for receive\n");
+	//  }
       }
     else
       {
@@ -333,10 +334,10 @@ struct RdmaTransport {
 	    //logger(LOG_WARNING, "Unable to request send completion queue notifications");
 	    fprintf(stdout, "WARN:\tUnable to request send completion queue notifications\n");
 	  }
-	else
-	  {
-	    fprintf(stdout, "DEBUG:\tCompletion queue sent for send\n");
-	  }
+	//else
+	//  {
+	//    fprintf(stdout, "DEBUG:\tCompletion queue sent for send\n");
+	//  }
       }
 
     // setup buffer for work requests that lives on the heap. The original one was on the stack
@@ -437,7 +438,8 @@ struct RdmaTransport {
 	  {
 	    for (uint32_t i=0; i<manager->numContiguousMessages; i++)
 	      {
-		fprintf(stdout, "DEBUG\tSetup %d\t%d\t receiver requests start\n", regionIndex, i);
+		//fprintf(stdout, "DEBUG\tSetup %d\t%d\t receiver requests start\n", regionIndex, i);
+		
 		assert(manager->messageSize > 0);
 		/* prepare one sgItem to receive */
 		sgItems[regionIndex][i].addr = (uint64_t)(manager->memoryRegions[regionIndex]->addr + i*manager->messageSize);
@@ -465,7 +467,7 @@ struct RdmaTransport {
 		    receiveRequests[regionIndex][i].next = &receiveRequests[regionIndex][i+1]; /* chain multiple workRequest together for performance */
 		  }
 
-		fprintf(stdout, "DEBUG\tSetup %d\t%d\t receive requests done\n", regionIndex, i);
+		//fprintf(stdout, "DEBUG\tSetup %d\t%d\t receive requests done\n", regionIndex, i);
 	      }
 	  }
       }
@@ -498,7 +500,7 @@ struct RdmaTransport {
 	  {
 	    for (uint32_t i=0; i<manager->numContiguousMessages; i++)
 	      {
-		fprintf(stdout, "DEBUG\tSetup %d\t%d\t send requests start\n", regionIndex, i);
+		//fprintf(stdout, "DEBUG\tSetup %d\t%d\t send requests start\n", regionIndex, i);
 
 		/* prepare one sgItem to send */
 		sgItems[regionIndex][i].addr = (uint64_t)(manager->memoryRegions[regionIndex]->addr + i*manager->messageSize);
@@ -523,7 +525,7 @@ struct RdmaTransport {
 		  {
 		    sendRequests[regionIndex][i].next = &sendRequests[regionIndex][i+1]; /* chain multiple workRequest together for performance */
 		  }
-		fprintf(stdout, "DEBUG\tSetup %d\t%d\t send requests done\n", regionIndex, i);
+		//fprintf(stdout, "DEBUG\tSetup %d\t%d\t send requests done\n", regionIndex, i);
 	      }
 	  }
       }    
@@ -731,7 +733,7 @@ struct RdmaTransport {
 	fprintf(stdout, "DEBUG:\twait for completions done\n");
       }
 
-    fprintf(stdout, "Lost, where am i???\n");
+    //fprintf(stdout, "Lost, where am i???\n");
   }
   
   void pollRequests()
@@ -796,7 +798,9 @@ struct RdmaTransport {
 		    else // if (immediateData - previousImmediateData > 1u) /* unsigned arithmetic with wraparound at UINT32_MAX */
 		      {
 			/* there are missing work completions */
-			uint32_t numMissingFound = immediateData - (previousImmediateData+1u);
+			//uint32_t numMissingFound = immediateData - (previousImmediateData+1u);
+
+			numMissingFound = immediateData - (previousImmediateData+1u);
 			numWorkRequestsMissing += numMissingFound;
 			metricWorkRequestsMissing += numMissingFound;
 			logger(LOG_WARNING, "Receiver detected missing %" PRIu32
@@ -860,6 +864,11 @@ struct RdmaTransport {
   {
     return numCompletionsFound;
   }
+
+  uint32_t get_numMissingFound()
+  {
+    return numMissingFound;
+  }
   
   // A easy way to get a vector of struct from python
   std::vector<struct ibv_wc> get_workCompletions()
@@ -881,7 +890,7 @@ struct RdmaTransport {
 		fprintf(stdout, "WARN:\tUnsuccessful write of data files\n");
     	      }
     	  }
-        displayMemoryBlocks(manager, 10, 10); /* display contents that were received */
+        //displayMemoryBlocks(manager, 10, 10); /* display contents that were received */
       }
 
     //if ((char *)metricURL != nullptr)
@@ -905,7 +914,7 @@ struct RdmaTransport {
     delete [] sgItems;
 
     //logger(LOG_INFO, "Receive Visibilities ending");
-    fprintf(stdout, "INFO:\tReceive Visibilities ending\n");
+    fprintf(stdout, "INFO:\tReceive Visibilities ending %d\n", mode);
   }  
   
   int addition(int a, int b){
@@ -1023,6 +1032,7 @@ PYBIND11_MODULE(rdma_transport, m) {
     .def("setLocalIdentifier",      &RdmaTransport::setLocalIdentifier)
     
     .def("get_numCompletionsFound", &RdmaTransport::get_numCompletionsFound)
+    .def("get_numMissingFound", &RdmaTransport::get_numMissingFound)
     .def("get_workCompletions",     &RdmaTransport::get_workCompletions)    
     .def("pollRequests",            &RdmaTransport::pollRequests)
     .def("waitRequestsCompletion",  &RdmaTransport::waitRequestsCompletion)
