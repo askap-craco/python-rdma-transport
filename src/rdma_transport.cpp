@@ -594,17 +594,18 @@ struct RdmaTransport {
             else
 	      {
                 //logger(LOG_INFO, "Receiver has posted work requests for region %" PRIu32, regionIndex);
-		fprintf(stdout, "INFO:\tReceiver has posted work requests for region %" PRIu32"\n", regionIndex);
-                /* check that the memory region isn't already populated with data */
-                if (manager->isMonitoringRegions && getMemoryRegionPopulated(manager, regionIndex))
-		  {
-		    //logger(LOG_WARNING, "Memory region %" PRIu32 " has been enqueued for receiving"
-		    //	   " but already populated while enqueueing work request %" PRIu64,
-		    //	   regionIndex, numWorkRequestsEnqueued + numWorkRequestsMissing);
-		    fprintf(stdout, "WARN:\tMemory region %" PRIu32 " has been enqueued for receiving"
-			    " but already populated while enqueueing work request %" PRIu64"\n",
-			    regionIndex, numWorkRequestsEnqueued + numWorkRequestsMissing);
-		  }
+		//fprintf(stdout, "INFO:\tReceiver has posted work requests for region %" PRIu32"\n", regionIndex);
+
+		///* check that the memory region isn't already populated with data */
+                //if (manager->isMonitoringRegions && getMemoryRegionPopulated(manager, regionIndex))
+		//  {
+		//    //logger(LOG_WARNING, "Memory region %" PRIu32 " has been enqueued for receiving"
+		//    //	   " but already populated while enqueueing work request %" PRIu64,
+		//    //	   regionIndex, numWorkRequestsEnqueued + numWorkRequestsMissing);
+		//    fprintf(stdout, "WARN:\tMemory region %" PRIu32 " has been enqueued for receiving"
+		//	    " but already populated while enqueueing work request %" PRIu64"\n",
+		//	    regionIndex, numWorkRequestsEnqueued + numWorkRequestsMissing);
+		//  }
                 currentQueueLoading += manager->numContiguousMessages;
                 numWorkRequestsEnqueued += manager->numContiguousMessages;
                 //setMemoryRegionEnqueued(manager, regionIndex, true);
@@ -634,17 +635,17 @@ struct RdmaTransport {
             else
 	      {
                 //logger(LOG_INFO, "Sender has posted work requests for region %" PRIu32, regionIndex);
-		fprintf(stdout, "INFO:\tSender has posted work requests for region %" PRIu32"\n", regionIndex);
+		//fprintf(stdout, "INFO:\tSender has posted work requests for region %" PRIu32"\n", regionIndex);
                 /* check that the memory region is already populated with data */
-                if (manager->isMonitoringRegions && !getMemoryRegionPopulated(manager, regionIndex))
-		  {
-                    //logger(LOG_WARNING, "Memory region %" PRIu32 " has been enqueued for sending"
-		    //	   " without first being populated while enqueing work request %" PRIu64,
-		    //	   regionIndex, numWorkRequestsEnqueued);
-                    fprintf(stdout, "WARN:\tMemory region %" PRIu32 " has been enqueued for sending"
-			    " without first being populated while enqueing work request %" PRIu64"\n",
-			    regionIndex, numWorkRequestsEnqueued);
-		  }
+                //if (manager->isMonitoringRegions && !getMemoryRegionPopulated(manager, regionIndex))
+		//  {
+                //    //logger(LOG_WARNING, "Memory region %" PRIu32 " has been enqueued for sending"
+		//    //	   " without first being populated while enqueing work request %" PRIu64,
+		//    //	   regionIndex, numWorkRequestsEnqueued);
+                //    fprintf(stdout, "WARN:\tMemory region %" PRIu32 " has been enqueued for sending"
+		//	    " without first being populated while enqueing work request %" PRIu64"\n",
+		//	    regionIndex, numWorkRequestsEnqueued);
+		//  }
                 currentQueueLoading += manager->numContiguousMessages;
                 numWorkRequestsEnqueued += manager->numContiguousMessages;
                 //setMemoryRegionEnqueued(manager, regionIndex, true);
@@ -679,15 +680,15 @@ struct RdmaTransport {
 	fprintf(stderr, "ERR:\tError while waiting for completion queue event\n");
 	throw std::runtime_error("ERR:\tError while waiting for completion queue event\n");
       }
-    else
-      {
-	fprintf(stdout, "DEBUF:\tibv_get_cq_event done\n");
-      }
+    //else
+    //  {
+    //	fprintf(stdout, "DEBUF:\tibv_get_cq_event done\n");
+    //  }
     /* assert: eventCompletionQueue is either receiveCompletionQueue or sendCompletionQueue */
     /* assert: eventContext is rdmaDeviceContext */
     /* acknowledge the one completion queue event */
     ibv_ack_cq_events(eventCompletionQueue, 1);
-    fprintf(stdout, "DEBUF:\tibv_ack_cq_event done\n");
+    //fprintf(stdout, "DEBUF:\tibv_ack_cq_event done\n");
     
     /* request notification for next completion event on the completion queue */
     if (ibv_req_notify_cq(eventCompletionQueue, 0) != SUCCESS)
@@ -695,10 +696,10 @@ struct RdmaTransport {
         //logger(LOG_WARNING, "Error while receiver requesting completion notification");
 	fprintf(stdout, "WARN:\tError while receiver requesting completion notification\n");
       }
-    else
-      {
-	fprintf(stdout, "DEBUF:\tibv_req_notify_event done\n");
-      }
+    //else
+    //  {
+    //	fprintf(stdout, "DEBUF:\tibv_req_notify_event done\n");
+    //  }
 
     return SUCCESS;
   }
@@ -708,19 +709,19 @@ struct RdmaTransport {
   */
   void waitRequestsCompletion()
   {
-    if ( mode == RECV_MODE)
-      {
-        /* poll for block of work completions */
-        //logger(LOG_INFO, "Receiver waiting for completion %" PRIu64 " of %" PRIu64,
-	//       numWorkRequestCompletions + numWorkRequestsMissing, manager->numTotalMessages);
-        fprintf(stdout, "INFO:\tReceiver waiting for completion %" PRIu64 " of %" PRIu64"\n",
-		numWorkRequestCompletions + numWorkRequestsMissing, manager->numTotalMessages);
-      }
-    else
-      {
-        //logger(LOG_INFO, "Sender waiting for completion %" PRIu64 " of %" PRIu64, numWorkRequestCompletions, manager->numTotalMessages);
-	fprintf(stdout, "INFO:\tSender waiting for completion %" PRIu64 " of %" PRIu64"\n", numWorkRequestCompletions, manager->numTotalMessages);
-      }
+    //if ( mode == RECV_MODE)
+    //  {
+    //    /* poll for block of work completions */
+    //    //logger(LOG_INFO, "Receiver waiting for completion %" PRIu64 " of %" PRIu64,
+    //	//       numWorkRequestCompletions + numWorkRequestsMissing, manager->numTotalMessages);
+    //    fprintf(stdout, "INFO:\tReceiver waiting for completion %" PRIu64 " of %" PRIu64"\n",
+    //		numWorkRequestCompletions + numWorkRequestsMissing, manager->numTotalMessages);
+    //  }
+    //else
+    //  {
+    //    //logger(LOG_INFO, "Sender waiting for completion %" PRIu64 " of %" PRIu64, numWorkRequestCompletions, manager->numTotalMessages);
+    //	fprintf(stdout, "INFO:\tSender waiting for completion %" PRIu64 " of %" PRIu64"\n", numWorkRequestCompletions, manager->numTotalMessages);
+    //  }
     
     if (waitForCompletionQueueEvent() != SUCCESS)
       {
@@ -728,10 +729,10 @@ struct RdmaTransport {
 	fprintf(stderr, "ERR:\tunable to wait for completion notification\n");
 	throw std::runtime_error("ERR:\tunable to wait for completion notification\n");
       }
-    else
-      {
-	fprintf(stdout, "DEBUG:\twait for completions done\n");
-      }
+    //else
+    //  {
+    //	fprintf(stdout, "DEBUG:\twait for completions done\n");
+    //  }
 
     //fprintf(stdout, "Lost, where am i???\n");
   }
@@ -751,11 +752,13 @@ struct RdmaTransport {
 
 	if (numCompletionsFound < 0)
 	  {
-	    logger(LOG_WARNING, "Receiver failed to poll for work completions");
+	    fprintf(stderr, "ERR:\tReceiver failed to poll for work completions");
+	    throw std::runtime_error("ERR:\tReceiver failed to poll for work completions");
 	  }
 	else
 	  {
-	    logger(LOG_INFO, "Receiver has polled %d work completions", numCompletionsFound);
+	    //logger(LOG_INFO, "Receiver has polled %d work completions", numCompletionsFound);
+	    //fprintf(stdout, "Receiver has polled %d work completions\n", numCompletionsFound);
 	    for (int wcIndex=0; wcIndex<numCompletionsFound; wcIndex++)
 	      {
 		struct ibv_wc workCompletion = workCompletions[wcIndex];
@@ -763,11 +766,11 @@ struct RdmaTransport {
 		uint32_t immediateData = ntohl(workCompletion.imm_data);
 		if (workCompletion.status != IBV_WC_SUCCESS)
 		  {
-		    logger(LOG_ERR,
-			   "Receiver work completion error with status:%d, id:%" PRIu64
-			   ", imm_data:%" PRIu32 ", syndrome:0x%x",
-			   workCompletion.status, workCompletion.wr_id, immediateData,
-			   workCompletion.vendor_err);
+		    fprintf(stderr, "ERR:\tReceiver work completion error with status:%d, id:%" PRIu64
+			    ", imm_data:%" PRIu32 ", syndrome:0x%x",
+			    workCompletion.status, workCompletion.wr_id, immediateData,
+			    workCompletion.vendor_err);
+		    throw std::runtime_error("ERR:\tReceiver work completion error");
 		  }
 		else
 		  {
@@ -776,10 +779,15 @@ struct RdmaTransport {
 		    //setMemoryRegionEnqueued(manager, transferredRegionIndex, false); /* note this gets reset for each of the contiguous messages */
 		    //setMemoryRegionPopulated(manager, transferredRegionIndex, true); /* note typically now want to utilise the data and then unpopulate region */
 		    setMessageTransferred(manager, transferredRegionIndex, transferredContiguousIndex, numWorkRequestCompletions+numWorkRequestsMissing);
-		    logger(LOG_DEBUG,
-			   "Receiver work completion %" PRIu64 " success status with work request id %" PRIu64
-			   " and immediate data %" PRIu32, numWorkRequestCompletions + numWorkRequestsMissing,
-			   workCompletion.wr_id, immediateData);
+
+		    //fprintf(stdout, "DEBUG:\tReceiver work completion %" PRIu64 " success status with work request id %" PRIu64
+		    //	    " and immediate data %" PRIu32, numWorkRequestCompletions + numWorkRequestsMissing,
+		    //	    workCompletion.wr_id, immediateData);
+		    //
+		    //logger(LOG_DEBUG,
+		    //	   "Receiver work completion %" PRIu64 " success status with work request id %" PRIu64
+		    //	   " and immediate data %" PRIu32, numWorkRequestCompletions + numWorkRequestsMissing,
+		    //	   workCompletion.wr_id, immediateData);
 		  }
 		if (hasImmediateData)
 		  {
@@ -787,9 +795,13 @@ struct RdmaTransport {
 		    if (immediateData == previousImmediateData)
 		      {
 			/* identical work completion immediate data values received */
-			logger(LOG_WARNING, "Receiver work completion %" PRIu64 " immediate data %" PRIu32
-			       " duplicated from previous messages", numWorkRequestCompletions + numWorkRequestsMissing,
-			       immediateData);
+			//logger(LOG_WARNING, "Receiver work completion %" PRIu64 " immediate data %" PRIu32
+			//       " duplicated from previous messages", numWorkRequestCompletions + numWorkRequestsMissing,
+			//       immediateData);
+
+			fprintf(stdout, "WARN:\tReceiver work completion %" PRIu64 " immediate data %" PRIu32
+				" duplicated from previous messages", numWorkRequestCompletions + numWorkRequestsMissing,
+				immediateData);
 		      }
 		    else if (immediateData == previousImmediateData + (uint32_t)1) /* unsigned arithmetic with wraparound at UINT32_MAX */
 		      {
@@ -803,9 +815,9 @@ struct RdmaTransport {
 			numMissingFound = immediateData - (previousImmediateData+1u);
 			numWorkRequestsMissing += numMissingFound;
 			metricWorkRequestsMissing += numMissingFound;
-			logger(LOG_WARNING, "Receiver detected missing %" PRIu32
-			       " message(s) while receiving work completion %" PRIu64,
-			       numMissingFound, numWorkRequestCompletions + numWorkRequestsMissing);
+			//logger(LOG_WARNING, "Receiver detected missing %" PRIu32
+			//       " message(s) while receiving work completion %" PRIu64,
+			//       numMissingFound, numWorkRequestCompletions + numWorkRequestsMissing);
 		      }
 		    previousImmediateData = immediateData;
 		  }
@@ -822,19 +834,22 @@ struct RdmaTransport {
 	numCompletionsFound = ibv_poll_cq(sendCompletionQueue, maxWorkRequestDequeue, workCompletions.data());
 	if (numCompletionsFound < 0)
 	  {
-	    logger(LOG_WARNING, "Sender failed to poll for work completions"); 
+	    fprintf(stderr, "ERR:\tSender failed to poll for work completions");
+	    throw std::runtime_error("ERR:\tSender failed to poll for work completions");
 	  }
 	else
 	  {
-	    logger(LOG_INFO, "Sender has polled %d work completions", numCompletionsFound);
+	    //logger(LOG_INFO, "Sender has polled %d work completions", numCompletionsFound);
+	    //fprintf(stdout, "Sender has polled %d work completions\n", numCompletionsFound);
+	    
 	    for (int wcIndex=0; wcIndex<numCompletionsFound; wcIndex++)
 	      {
 		struct ibv_wc workCompletion = workCompletions[wcIndex];
 		if (workCompletion.status != IBV_WC_SUCCESS)
 		  {
-		    logger(LOG_ERR,
-			   "Sender work completion error with status:%d, id:%" PRIu64 ", imm_data:%" PRIu32 ", syndrome:0x%x",
-			   workCompletion.status, workCompletion.wr_id, workCompletion.imm_data, workCompletion.vendor_err);
+		    fprintf(stderr, "ERR:\tSender work completion error with status:%d, id:%" PRIu64 ", imm_data:%" PRIu32 ", syndrome:0x%x",
+			    workCompletion.status, workCompletion.wr_id, workCompletion.imm_data, workCompletion.vendor_err);
+		    throw std::runtime_error("ERR:\tSender work completion error");
 		  }
 		else
 		  {
@@ -845,9 +860,13 @@ struct RdmaTransport {
 		    /* set memory region to be unpopulated so can be repopulated with further data */
 		    //setMemoryRegionPopulated(manager, transferredRegionIndex, false);
 		    setMessageTransferred(manager, transferredRegionIndex, transferredContiguousIndex, numWorkRequestCompletions);
-		    logger(LOG_DEBUG,
-			   "Sender work completion %" PRIu64 " success status with work request id %" PRIu64,
-			   numWorkRequestCompletions, workCompletion.wr_id);
+		   //logger(LOG_DEBUG,
+		   //	   "Sender work completion %" PRIu64 " success status with work request id %" PRIu64,
+		   //	   numWorkRequestCompletions, workCompletion.wr_id);
+		   //
+		   //fprintf(stdout,
+		   //	   "DEBUG:\tSender work completion %" PRIu64 " success status with work request id %" PRIu64,
+		   //	   numWorkRequestCompletions, workCompletion.wr_id);
 		  }
 		currentQueueLoading--;
 		numWorkRequestCompletions++;
