@@ -3,8 +3,6 @@
 
 extern "C" {
 #include "RDMAapi.h"
-  //#include "RDMAmemorymanager.h"
-  //#include "RDMAexchangeidcallbacks.h"
 }
 
 
@@ -30,10 +28,6 @@ struct RdmaTransport {
   char* rdmaDeviceName = nullptr; /* no preferred rdma device name to choose */
   uint8_t rdmaPort = 1;
   int gidIndex = -1; /* preferred gid index or -1 for no preference */
-  //const char* identifierFileName = nullptr; /* default to using stdio for exchanging RDMA identifiers */
-  //char identifierFileName[1024]; /* default to using stdio for exchanging RDMA identifiers */
-  //char identifier_filename[1024] = {'0'};
-  //char *identifier_filename; //[1024] = {'0'};
   char* metricURL = nullptr; /* default to not push metrics */
   uint32_t numMetricAveraging = 0; /* number of message completions over which to average metrics, default to numMemoryBlocks*numContiguousMessages */
 
@@ -106,7 +100,6 @@ struct RdmaTransport {
 		char* _rdmaDeviceName,
 		uint8_t _rdmaPort,
 		int _gidIndex,
-		//const char* _identifierFileName,
 		char* _metricURL,
 		uint32_t _numMetricAveraging) :
     requestLogLevel(_requestLogLevel),
@@ -120,19 +113,9 @@ struct RdmaTransport {
     rdmaDeviceName(_rdmaDeviceName),
     rdmaPort(_rdmaPort),
     gidIndex(_gidIndex),
-    //identifierFileName(_identifierFileName),
     metricURL(_metricURL),
     numMetricAveraging(_numMetricAveraging)   
   {
-    //fprintf(stdout, "DID we get the newer version???\n");
-    //fprintf(stdout, "identifier file name is %s\n", identifierFileName);
-
-    //strncpy(identifier_filename, identifierFileName, 1024);
-    //strcpy(identifier_filename, identifierFileName);
-
-    //fprintf(stdout, "DID we get the newer version???\n");
-    //fprintf(stdout, "identifier file name is %s\n", identifier_filename);
-    
     if (numTotalMessages == 0)
       numTotalMessages = numMemoryBlocks * numContiguousMessages;
     if (numMetricAveraging == 0)
@@ -141,12 +124,10 @@ struct RdmaTransport {
 
     if (mode == RECV_MODE)
       {
-        //logger(LOG_INFO, "Receive Visibilities starting as receiver");
 	fprintf(stdout, "INFO:\tReceive Visibilities starting as receiver\n");
       }
     else
       {
-        //logger(LOG_INFO, "Receive Visibilities starting as sender");
 	fprintf(stdout, "INFO:\tReceive Visibilities starting as sender\n");
       }
 
@@ -177,7 +158,6 @@ struct RdmaTransport {
             // read data from dataFileName.0, dataFileName.1, ... into memory blocks
             if (!readFilesIntoMemoryBlocks(manager, dataFileName))
 	      {
-                //logger(LOG_WARNING, "Unsuccessful read of data files");
 		fprintf(stdout, "WARN:\tUnsuccessful read of data files\n");
 	      }
 	  }
@@ -200,18 +180,15 @@ struct RdmaTransport {
     if (numMetricAveraging == 0)
       numMetricAveraging = manager->numMemoryRegions * manager->numContiguousMessages;
 
-    //logger(LOG_INFO, "Receive Visibilities starting");
     fprintf(stdout, "INFO:\tReceive Visibilities starting");
     if (mode == RECV_MODE)
-      //logger(LOG_INFO, "Running as receiver");
       fprintf(stdout, "INFO:\tRunning as receiver\n");
     else
-      //logger(LOG_INFO, "Running as sender");
       fprintf(stdout, "INDO:\tRunning as sender\n");
 
     /* initialise libibverb data structures so have fork() protection */
     /* note this has a performance hit, and is optional */
-    // enableForkProtection();
+    //enableForkProtection();
 
     /* allocate all the RDMA resources */
     queueCapacity = manager->numContiguousMessages * manager->numMemoryRegions ; /* minimum capacity for completion queues */
@@ -221,34 +198,18 @@ struct RdmaTransport {
 			      &rdmaDeviceContext, &eventChannel, &protectionDomain, &receiveCompletionQueue,
 			      &sendCompletionQueue, &queuePair) != SUCCESS)
       {
-        //logger(LOG_CRIT, "Unable to allocate the RDMA resources");
-	//exit(FAILURE);
-
-	fprintf(stderr, "ERR:\tUnable to allocate the RDMA resources\n");
+    	fprintf(stderr, "ERR:\tUnable to allocate the RDMA resources\n");
 	throw std::runtime_error( "ERR:\tUnable to allocate the RDMA resources");
       }
-    //else
-    //  //logger(LOG_DEBUG, "RDMA resources allocated");
-    //  fprintf(stdout, "DEBUG:\tRDMA resources allocated\n");
     
     /* set up the RDMA connection */
-    //uint16_t localIdentifier;
-    //union ibv_gid gidAddress;
-    //enum ibv_mtu mtu;
     if (setupRDMAConnection(rdmaDeviceContext, rdmaPort, &localIdentifier,
 			    &gidAddress, &gidIndex, &mtu) != SUCCESS)
       {
-        //logger(LOG_CRIT, "Unable to set up the RDMA connection");
-	//exit(FAILURE);
-	
 	fprintf(stderr, "ERR:\tUnable to set up the RDMA connection\n");
 	throw std::runtime_error( "ERR:\tUnable to set up the RDMA connection");
       }
-    //else
-    //  //logger(LOG_DEBUG, "RDMA connection set up");
-    //  fprintf(stdout, "DEBUG:\tRDMA connection set up\n");
-    
-    //logger(LOG_INFO, "RDMA connection initialised on local %s", mode ? "sender" : "receiver");
+
     fprintf(stdout, "INFO:\tRDMA connection initialised on local %s", mode ? "sender" : "receiver\n");
 
     /* initialise the random number generator to generate a 24-bit psn */
@@ -264,7 +225,6 @@ struct RdmaTransport {
     fprintf(stdout, "identifier file name is %s\n", identifierFileName);
     
     /* We either exchange information with shared file or with messages, no stdio anymore */ 
-    //if (identifier_filename != nullptr)
     if (identifierFileName != nullptr)
       {
         setIdentifierFileName(identifierFileName);
@@ -274,8 +234,6 @@ struct RdmaTransport {
     				   packetSequenceNumber, queuePairNumber, gidAddress, localIdentifier,
     				   &remotePSN, &remoteQPN, &remoteGID, &remoteLID) != EXCH_SUCCESS)
     	  {
-    	    //logger(LOG_CRIT, "Unable to exchange identifiers via provided exchange function");
-    	    //exit(FAILURE);
     	    fprintf(stderr, "ERR:\tUnable to exchange identifiers via provided exchange function\n");
     	    throw std::runtime_error("ERR:\tUnable to exchange identifiers via provided exchange function\n");
     	  }
@@ -286,64 +244,35 @@ struct RdmaTransport {
     if (modifyQueuePairReady(queuePair, rdmaPort, gidIndex, mode, packetSequenceNumber,
 			     remotePSN, remoteQPN, remoteGID, remoteLID, mtu) != SUCCESS)
       {
-        //logger(LOG_CRIT, "Unable to modify queue pair to be ready");
-	//exit(FAILURE);
-	
 	fprintf(stderr, "ERR:\tUnable to modify queue pair to be ready\n");
 	throw std::runtime_error("ERR:\tUnable to modify queue pair to be ready\n");
       }
-    //else
-    //  //logger(LOG_DEBUG, "Queue pair modified to be ready");
-    //  fprintf(stdout, "DEBUG:\tQueue pair modified to be ready\n");
     
     /* register memory blocks as memory regions for buffer */
     if (registerMemoryRegions(protectionDomain, manager) != SUCCESS)
       {
-        //logger(LOG_CRIT, "Unable to allocate memory regions");
-	//exit(FAILURE);
-
 	fprintf(stderr, "ERR:\tUnable to allocate memory regions\n");
 	throw std::runtime_error("ERR:\tUnable to allocate memory regions\n");
       }
-    //else
-    //  {
-    // fprintf(stdout, "DEBUG:\tMemory regions registered\n");
-    //  }
     
     /* perform the rdma data transfer */
     if (mode == RECV_MODE)
       {
 	if (ibv_req_notify_cq(receiveCompletionQueue, 0) != SUCCESS)
 	  {
-	    //logger(LOG_ERR, "Unable to request receive completion queue notifications");
-	    //if (mode == RECV_MODE)
-	    //  exit(FAILURE);
-	    
 	    fprintf(stderr, "ERR:\tUnable to request receive completion queue notifications\n");
 	    throw std::runtime_error("ERR:\tUnable to request receive completion queue notifications\n");
 	  }
-	//else
-	//  {
-	//    fprintf(stdout, "DEBUG:\tCompletion queue sent for receive\n");
-	//  }
       }
     else
       {
 	if (ibv_req_notify_cq(sendCompletionQueue, 0) != SUCCESS)
 	  {
-	    //logger(LOG_WARNING, "Unable to request send completion queue notifications");
 	    fprintf(stdout, "WARN:\tUnable to request send completion queue notifications\n");
 	  }
-	//else
-	//  {
-	//    fprintf(stdout, "DEBUG:\tCompletion queue sent for send\n");
-	//  }
       }
 
     // setup buffer for work requests that lives on the heap. The original one was on the stack
-    //struct ibv_sge sgItems[manager->numMemoryRegions][manager->numContiguousMessages];
-    //memset(sgItems, 0, sizeof(struct ibv_sge[manager->numMemoryRegions][manager->numContiguousMessages]));
-
     sgItems = new struct ibv_sge*[manager->numMemoryRegions];
     for(auto iregion = 0; iregion < manager->numMemoryRegions; iregion++) {
       sgItems[iregion] = new struct ibv_sge[manager->numContiguousMessages];
@@ -413,10 +342,7 @@ struct RdmaTransport {
     if (mode == RECV_MODE)
       {      
 	/* Setup memory space for requests and reset it to 0*/
-	//struct ibv_recv_wr receiveRequests[manager->numMemoryRegions][manager->numContiguousMessages];
-	//memset(receiveRequests, 0, sizeof(struct ibv_recv_wr[manager->numMemoryRegions][manager->numContiguousMessages]));
-
-        assert(manager->numMemoryRegions > 0);
+	assert(manager->numMemoryRegions > 0);
 	receiveRequests = (ibv_recv_wr**) calloc(manager->numMemoryRegions, sizeof(ibv_recv_wr*));
 	if(receiveRequests == nullptr)
 	  {
@@ -432,31 +358,21 @@ struct RdmaTransport {
 		throw std::runtime_error("ERR:\tCould not calloc receive requests\n");
 	      }
 	  }      
-	//memset(receiveRequests, 0, manager->numMemoryRegions*manager->numContiguousMessages*sizeof(struct ibv_recv_wr));
 	
 	for (uint32_t regionIndex=0; regionIndex<manager->numMemoryRegions; regionIndex++)
 	  {
 	    for (uint32_t i=0; i<manager->numContiguousMessages; i++)
 	      {
-		//fprintf(stdout, "DEBUG\tSetup %d\t%d\t receiver requests start\n", regionIndex, i);
-		
 		assert(manager->messageSize > 0);
 		/* prepare one sgItem to receive */
 		sgItems[regionIndex][i].addr = (uint64_t)(manager->memoryRegions[regionIndex]->addr + i*manager->messageSize);
 		sgItems[regionIndex][i].length = manager->messageSize;
 		sgItems[regionIndex][i].lkey = manager->memoryRegions[regionIndex]->lkey;
-
-		//fprintf(stdout, "\n\n\nIAMHERE 1 %d\t%d\t%"PRIu64"\n\n\n", manager->numMemoryRegions, manager->numContiguousMessages, (uint64_t)(regionIndex*manager->numContiguousMessages + i));
 		
 		/* prepare one workRequest with this sgItem */
 		receiveRequests[regionIndex][i].wr_id = (uint64_t)(regionIndex*manager->numContiguousMessages + i); /* gives memory region and location */
-		//fprintf(stdout, "\n\n\nIAMHERE 2\n\n\n");
-
 		receiveRequests[regionIndex][i].sg_list = &sgItems[regionIndex][i];
-		//fprintf(stdout, "\n\n\nIAMHERE 3\n\n\n");
-
 		receiveRequests[regionIndex][i].num_sge = sgListLength;
-
 		
 		if (i == manager->numContiguousMessages-1)
 		  {
@@ -466,17 +382,11 @@ struct RdmaTransport {
 		  {
 		    receiveRequests[regionIndex][i].next = &receiveRequests[regionIndex][i+1]; /* chain multiple workRequest together for performance */
 		  }
-
-		//fprintf(stdout, "DEBUG\tSetup %d\t%d\t receive requests done\n", regionIndex, i);
 	      }
 	  }
       }
     else
       {
-	/* Setup memory space for requests and reset it to 0*/
-	//struct ibv_send_wr sendRequests[manager->numMemoryRegions][manager->numContiguousMessages];
-	//memset(sendRequests, 0, sizeof(struct ibv_send_wr[manager->numMemoryRegions][manager->numContiguousMessages]));
-
 	/* Setup memory space for requests and reset it to 0*/
 	sendRequests = (ibv_send_wr**) calloc(manager->numMemoryRegions, sizeof(ibv_send_wr*));
 	if(sendRequests == nullptr)
@@ -493,15 +403,11 @@ struct RdmaTransport {
 		throw std::runtime_error("ERR:\tCould not calloc send requests\n");
 	      }
 	  }
-	//memset(sendRequests, 0, manager->numMemoryRegions*manager->numContiguousMessages*sizeof(struct ibv_send_wr));
-	//memset(sendRequests, 0, sizeof(struct ibv_send_wr[manager->numMemoryRegions][manager->numContiguousMessages]));
-
+	
 	for (uint32_t regionIndex=0; regionIndex<manager->numMemoryRegions; regionIndex++)
 	  {
 	    for (uint32_t i=0; i<manager->numContiguousMessages; i++)
 	      {
-		//fprintf(stdout, "DEBUG\tSetup %d\t%d\t send requests start\n", regionIndex, i);
-
 		/* prepare one sgItem to send */
 		sgItems[regionIndex][i].addr = (uint64_t)(manager->memoryRegions[regionIndex]->addr + i*manager->messageSize);
 		sgItems[regionIndex][i].length = manager->messageSize;
@@ -525,7 +431,6 @@ struct RdmaTransport {
 		  {
 		    sendRequests[regionIndex][i].next = &sendRequests[regionIndex][i+1]; /* chain multiple workRequest together for performance */
 		  }
-		//fprintf(stdout, "DEBUG\tSetup %d\t%d\t send requests done\n", regionIndex, i);
 	      }
 	  }
       }    
@@ -537,27 +442,13 @@ struct RdmaTransport {
     /* setup for loop enqueueing blocks of work requests and polling for blocks of work completions */
     minWorkRequestEnqueue = (uint32_t) ceil(queueCapacity * MIN_WORK_REQUEST_ENQUEUE);
     maxWorkRequestDequeue = queueCapacity; /* try to completely drain queue of any completed work requests */
-    //workCompletions.resize(maxWorkRequestDequeue);
+    workCompletions.resize(maxWorkRequestDequeue);
     
-    //if (workCompletions == nullptr)
-    //  {
-    //	//logger(LOG_ERR, "Receiver unable to allocate desired memory for work completions");
-    //	fprintf(stderr, "ERR:\tReceiver unable to allocate desired memory for work completions\n");
-    //	exit(FAILURE);
-    //  }
-
-    //setAllMemoryRegionsEnqueued(manager, false); 
-    //if (metricURL != nullptr)
-    //  {
-    //	initialiseMetricReporter();
-    //  }
     currentQueueLoading = 0; /* no work requests initially in queue */
     numWorkRequestsEnqueued = 0;
     previousImmediateData = UINT32_MAX;
     if (previousImmediateData+(uint32_t)1 != (uint32_t)0)
       {
-	//logger(LOG_ERR, "Assertion that UINT32_MAX+1 == 0 has failed, so error checking immediate values");
-	//fprintf(stderr, "ERR:\tAssertion that UINT32_MAX+1 == 0 has failed, so error checking immediate values\n");
 	throw std::runtime_error("ERR:\tAssertion that UINT32_MAX+1 == 0 has failed, so error checking immediate values\n");
       }
     numWorkRequestsMissing = 0; /* determined by finding non-incrementing immediate data values */
@@ -567,10 +458,6 @@ struct RdmaTransport {
     /* initialise metrics */
     metricMessagesTransferred = 0;
     metricWorkRequestsMissing = 0;
-  
-    ///* initialise sender metrics */
-    //metricStartClockTime = clock();
-    //gettimeofday(&metricStartWallTime, nullptr);
   }
 
   /*
@@ -587,28 +474,13 @@ struct RdmaTransport {
             assert(regionIndex < manager->numMemoryRegions);
             if (ibv_post_recv(queuePair, &receiveRequests[regionIndex][0], &badReceiveRequest) != SUCCESS)
 	      {
-                //logger(LOG_ERR, "Unable to post receive request with error %d", errno);
 		fprintf(stderr, "ERR:\tUnable to post receive request with error %d\n", errno);
 		throw std::runtime_error("ERR:\tUnable to post receive request with error\n");
 	      }
             else
 	      {
-                //logger(LOG_INFO, "Receiver has posted work requests for region %" PRIu32, regionIndex);
-		//fprintf(stdout, "INFO:\tReceiver has posted work requests for region %" PRIu32"\n", regionIndex);
-
-		///* check that the memory region isn't already populated with data */
-                //if (manager->isMonitoringRegions && getMemoryRegionPopulated(manager, regionIndex))
-		//  {
-		//    //logger(LOG_WARNING, "Memory region %" PRIu32 " has been enqueued for receiving"
-		//    //	   " but already populated while enqueueing work request %" PRIu64,
-		//    //	   regionIndex, numWorkRequestsEnqueued + numWorkRequestsMissing);
-		//    fprintf(stdout, "WARN:\tMemory region %" PRIu32 " has been enqueued for receiving"
-		//	    " but already populated while enqueueing work request %" PRIu64"\n",
-		//	    regionIndex, numWorkRequestsEnqueued + numWorkRequestsMissing);
-		//  }
                 currentQueueLoading += manager->numContiguousMessages;
                 numWorkRequestsEnqueued += manager->numContiguousMessages;
-                //setMemoryRegionEnqueued(manager, regionIndex, true);
                 regionIndex++;
                 if (regionIndex >= manager->numMemoryRegions)
 		  regionIndex = 0;
@@ -628,28 +500,14 @@ struct RdmaTransport {
 	      }
             if (ibv_post_send(queuePair, &sendRequests[regionIndex][0], &badSendRequest) != SUCCESS)
 	      {
-                //logger(LOG_ERR, "Unable to post send request with error %d", errno);
 		fprintf(stderr, "ERR:\tUnable to post send request with error %d\n", errno);
 		throw std::runtime_error("ERR:\tUnable to post send request with error");
 	      }
             else
 	      {
-                //logger(LOG_INFO, "Sender has posted work requests for region %" PRIu32, regionIndex);
-		//fprintf(stdout, "INFO:\tSender has posted work requests for region %" PRIu32"\n", regionIndex);
-                /* check that the memory region is already populated with data */
-                //if (manager->isMonitoringRegions && !getMemoryRegionPopulated(manager, regionIndex))
-		//  {
-                //    //logger(LOG_WARNING, "Memory region %" PRIu32 " has been enqueued for sending"
-		//    //	   " without first being populated while enqueing work request %" PRIu64,
-		//    //	   regionIndex, numWorkRequestsEnqueued);
-                //    fprintf(stdout, "WARN:\tMemory region %" PRIu32 " has been enqueued for sending"
-		//	    " without first being populated while enqueing work request %" PRIu64"\n",
-		//	    regionIndex, numWorkRequestsEnqueued);
-		//  }
                 currentQueueLoading += manager->numContiguousMessages;
                 numWorkRequestsEnqueued += manager->numContiguousMessages;
-                //setMemoryRegionEnqueued(manager, regionIndex, true);
-                regionIndex++;
+		regionIndex++;
                 if (regionIndex >= manager->numMemoryRegions)
 		  regionIndex = 0;
                 microSleep(messageDelayTime);
@@ -673,33 +531,21 @@ struct RdmaTransport {
     void *eventContext;
     assert(eventChannel != NULL);
     if (ibv_get_cq_event(eventChannel, &eventCompletionQueue, &eventContext) != SUCCESS)
-      {
-        //logger(LOG_ERR, "Error while waiting for completion queue event");
-	//return FAILURE;
-	
+      {	
 	fprintf(stderr, "ERR:\tError while waiting for completion queue event\n");
 	throw std::runtime_error("ERR:\tError while waiting for completion queue event\n");
       }
-    //else
-    //  {
-    //	fprintf(stdout, "DEBUF:\tibv_get_cq_event done\n");
-    //  }
+    
     /* assert: eventCompletionQueue is either receiveCompletionQueue or sendCompletionQueue */
     /* assert: eventContext is rdmaDeviceContext */
     /* acknowledge the one completion queue event */
     ibv_ack_cq_events(eventCompletionQueue, 1);
-    //fprintf(stdout, "DEBUF:\tibv_ack_cq_event done\n");
-    
+        
     /* request notification for next completion event on the completion queue */
     if (ibv_req_notify_cq(eventCompletionQueue, 0) != SUCCESS)
       {
-        //logger(LOG_WARNING, "Error while receiver requesting completion notification");
-	fprintf(stdout, "WARN:\tError while receiver requesting completion notification\n");
+    	fprintf(stdout, "WARN:\tError while receiver requesting completion notification\n");
       }
-    //else
-    //  {
-    //	fprintf(stdout, "DEBUF:\tibv_req_notify_event done\n");
-    //  }
 
     return SUCCESS;
   }
@@ -708,42 +554,19 @@ struct RdmaTransport {
     This function block previous work request until it finishes 
   */
   void waitRequestsCompletion()
-  {
-    //if ( mode == RECV_MODE)
-    //  {
-    //    /* poll for block of work completions */
-    //    //logger(LOG_INFO, "Receiver waiting for completion %" PRIu64 " of %" PRIu64,
-    //	//       numWorkRequestCompletions + numWorkRequestsMissing, manager->numTotalMessages);
-    //    fprintf(stdout, "INFO:\tReceiver waiting for completion %" PRIu64 " of %" PRIu64"\n",
-    //		numWorkRequestCompletions + numWorkRequestsMissing, manager->numTotalMessages);
-    //  }
-    //else
-    //  {
-    //    //logger(LOG_INFO, "Sender waiting for completion %" PRIu64 " of %" PRIu64, numWorkRequestCompletions, manager->numTotalMessages);
-    //	fprintf(stdout, "INFO:\tSender waiting for completion %" PRIu64 " of %" PRIu64"\n", numWorkRequestCompletions, manager->numTotalMessages);
-    //  }
-    
+  {    
     if (waitForCompletionQueueEvent() != SUCCESS)
       {
 	//logger(LOG_ERR, "Receiver unable to wait for completion notification");
 	fprintf(stderr, "ERR:\tunable to wait for completion notification\n");
 	throw std::runtime_error("ERR:\tunable to wait for completion notification\n");
       }
-    //else
-    //  {
-    //	fprintf(stdout, "DEBUG:\twait for completions done\n");
-    //  }
-
-    //fprintf(stdout, "Lost, where am i???\n");
   }
   
   void pollRequests()
-  {
-    //fprintf(stdout, "DEBUG:\tpoll requests now\n");
-    
+  {    
     numCompletionsFound = 0;
-    workCompletions.resize(maxWorkRequestDequeue);
-    std::fill(workCompletions.begin(), workCompletions.end(), ibv_wc{0});
+    numMissingFound = 0;
     
     if (mode == RECV_MODE)
       {
@@ -757,8 +580,6 @@ struct RdmaTransport {
 	  }
 	else
 	  {
-	    //logger(LOG_INFO, "Receiver has polled %d work completions", numCompletionsFound);
-	    //fprintf(stdout, "Receiver has polled %d work completions\n", numCompletionsFound);
 	    for (int wcIndex=0; wcIndex<numCompletionsFound; wcIndex++)
 	      {
 		struct ibv_wc workCompletion = workCompletions[wcIndex];
@@ -776,18 +597,7 @@ struct RdmaTransport {
 		  {
 		    uint32_t transferredRegionIndex = (uint32_t)(workCompletion.wr_id / manager->numContiguousMessages);
 		    uint32_t transferredContiguousIndex = (uint32_t)(workCompletion.wr_id % manager->numContiguousMessages);
-		    //setMemoryRegionEnqueued(manager, transferredRegionIndex, false); /* note this gets reset for each of the contiguous messages */
-		    //setMemoryRegionPopulated(manager, transferredRegionIndex, true); /* note typically now want to utilise the data and then unpopulate region */
 		    setMessageTransferred(manager, transferredRegionIndex, transferredContiguousIndex, numWorkRequestCompletions+numWorkRequestsMissing);
-
-		    //fprintf(stdout, "DEBUG:\tReceiver work completion %" PRIu64 " success status with work request id %" PRIu64
-		    //	    " and immediate data %" PRIu32, numWorkRequestCompletions + numWorkRequestsMissing,
-		    //	    workCompletion.wr_id, immediateData);
-		    //
-		    //logger(LOG_DEBUG,
-		    //	   "Receiver work completion %" PRIu64 " success status with work request id %" PRIu64
-		    //	   " and immediate data %" PRIu32, numWorkRequestCompletions + numWorkRequestsMissing,
-		    //	   workCompletion.wr_id, immediateData);
 		  }
 		if (hasImmediateData)
 		  {
@@ -795,10 +605,6 @@ struct RdmaTransport {
 		    if (immediateData == previousImmediateData)
 		      {
 			/* identical work completion immediate data values received */
-			//logger(LOG_WARNING, "Receiver work completion %" PRIu64 " immediate data %" PRIu32
-			//       " duplicated from previous messages", numWorkRequestCompletions + numWorkRequestsMissing,
-			//       immediateData);
-
 			fprintf(stdout, "WARN:\tReceiver work completion %" PRIu64 " immediate data %" PRIu32
 				" duplicated from previous messages", numWorkRequestCompletions + numWorkRequestsMissing,
 				immediateData);
@@ -810,14 +616,12 @@ struct RdmaTransport {
 		    else // if (immediateData - previousImmediateData > 1u) /* unsigned arithmetic with wraparound at UINT32_MAX */
 		      {
 			/* there are missing work completions */
-			//uint32_t numMissingFound = immediateData - (previousImmediateData+1u);
-
 			numMissingFound = immediateData - (previousImmediateData+1u);
 			numWorkRequestsMissing += numMissingFound;
 			metricWorkRequestsMissing += numMissingFound;
-			//logger(LOG_WARNING, "Receiver detected missing %" PRIu32
-			//       " message(s) while receiving work completion %" PRIu64,
-			//       numMissingFound, numWorkRequestCompletions + numWorkRequestsMissing);
+			logger(LOG_WARNING, "Receiver detected missing %" PRIu32
+			       " message(s) while receiving work completion %" PRIu64,
+			       numMissingFound, numWorkRequestCompletions + numWorkRequestsMissing);
 		      }
 		    previousImmediateData = immediateData;
 		  }
@@ -826,7 +630,6 @@ struct RdmaTransport {
 		metricMessagesTransferred++;
 	      }
 	  }
-	//setAllMemoryRegionsPopulated(manager, false);
       }
     else
       {
@@ -839,9 +642,6 @@ struct RdmaTransport {
 	  }
 	else
 	  {
-	    //logger(LOG_INFO, "Sender has polled %d work completions", numCompletionsFound);
-	    //fprintf(stdout, "Sender has polled %d work completions\n", numCompletionsFound);
-	    
 	    for (int wcIndex=0; wcIndex<numCompletionsFound; wcIndex++)
 	      {
 		struct ibv_wc workCompletion = workCompletions[wcIndex];
@@ -856,23 +656,13 @@ struct RdmaTransport {
 		    /* note imm_data seems to not appear in sender's workCompletion */
 		    uint32_t transferredRegionIndex = (uint32_t)(workCompletion.wr_id / manager->numContiguousMessages);
 		    uint32_t transferredContiguousIndex = (uint32_t)(workCompletion.wr_id % manager->numContiguousMessages);
-		    //setMemoryRegionEnqueued(manager, transferredRegionIndex, false);
 		    /* set memory region to be unpopulated so can be repopulated with further data */
-		    //setMemoryRegionPopulated(manager, transferredRegionIndex, false);
 		    setMessageTransferred(manager, transferredRegionIndex, transferredContiguousIndex, numWorkRequestCompletions);
-		   //logger(LOG_DEBUG,
-		   //	   "Sender work completion %" PRIu64 " success status with work request id %" PRIu64,
-		   //	   numWorkRequestCompletions, workCompletion.wr_id);
-		   //
-		   //fprintf(stdout,
-		   //	   "DEBUG:\tSender work completion %" PRIu64 " success status with work request id %" PRIu64,
-		   //	   numWorkRequestCompletions, workCompletion.wr_id);
 		  }
 		currentQueueLoading--;
 		numWorkRequestCompletions++;
 		metricMessagesTransferred++;
 	      }
-	    //setAllMemoryRegionsPopulated(manager, false);
 	  }	
       }
     
@@ -905,17 +695,11 @@ struct RdmaTransport {
             // write data to dataFileName.0, dataFileName.1, ... from memory blocks
             if (!writeFilesFromMemoryBlocks(manager, dataFileName))
     	      {
-                //logger(LOG_WARNING, "Unsuccessful write of data files");
 		fprintf(stdout, "WARN:\tUnsuccessful write of data files\n");
     	      }
     	  }
         //displayMemoryBlocks(manager, 10, 10); /* display contents that were received */
       }
-
-    //if ((char *)metricURL != nullptr)
-    //  {
-    //    cleanupMetricReporter();
-    //  }
 
     deregisterMemoryRegions(manager);
 
@@ -932,7 +716,6 @@ struct RdmaTransport {
     }
     delete [] sgItems;
 
-    //logger(LOG_INFO, "Receive Visibilities ending");
     fprintf(stdout, "INFO:\tReceive Visibilities ending %d\n", mode);
   }  
   
@@ -955,7 +738,6 @@ struct RdmaTransport {
   py::memoryview get_memoryview(uint32_t blockid) {
     uint64_t memoryBlockSize = messageSize * numContiguousMessages;
     if (blockid >= numMemoryBlocks) {
-      //throw std::runtime_error("blockid exceeds numMemoryBlocks");
       throw py::index_error("blockid exceeds numMemoryBlocks");
     }
     return py::memoryview::from_memory(
@@ -1031,15 +813,9 @@ PYBIND11_MODULE(rdma_transport, m) {
 	 char*,
 	 uint8_t, 
 	 int, 
-	 //char*,
 	 char*,
 	 uint32_t>())
 
-    //.def_readonly("workCompletions", &RdmaTransport::workCompletions)
-    //.def_readonly("numCompletionsFound", &RdmaTransport::numCompletionsFound)
-    //.def_readwrite("sendCompletionQueue", &RdmaTransport::sendCompletionQueue)
-    //.def_readwrite("receiveCompletionQueue", &RdmaTransport::receiveCompletionQueue)
-    
     .def("getPacketSequenceNumber", &RdmaTransport::getPacketSequenceNumber)
     .def("getQueuePairNumber",      &RdmaTransport::getQueuePairNumber)
     .def("getGidAddress",           &RdmaTransport::getGidAddress)
@@ -1051,7 +827,7 @@ PYBIND11_MODULE(rdma_transport, m) {
     .def("setLocalIdentifier",      &RdmaTransport::setLocalIdentifier)
     
     .def("get_numCompletionsFound", &RdmaTransport::get_numCompletionsFound)
-    .def("get_numMissingFound", &RdmaTransport::get_numMissingFound)
+    .def("get_numMissingFound",     &RdmaTransport::get_numMissingFound)
     .def("get_workCompletions",     &RdmaTransport::get_workCompletions)    
     .def("pollRequests",            &RdmaTransport::pollRequests)
     .def("waitRequestsCompletion",  &RdmaTransport::waitRequestsCompletion)
@@ -1068,9 +844,7 @@ PYBIND11_MODULE(rdma_transport, m) {
   // https://pybind11.readthedocs.io/en/stable/advanced/pycpp/numpy.html
   // expections
   // https://blog.ekbana.com/write-a-python-binding-for-your-c-code-using-pybind11-library-ef0992d4b68
-  
-  //cls.def_property_readonly("numCompletionsFound", [](py::object) { return RdmaTransport::numCompletionsFound; });
-  
+    
 #ifdef VERSION_INFO
   m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);
 #else
