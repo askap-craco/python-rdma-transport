@@ -124,13 +124,13 @@ struct RdmaTransport {
     metricURL(_metricURL),
     numMetricAveraging(_numMetricAveraging)   
   {
-    fprintf(stdout, "DID we get the newer version???\n");
+    //fprintf(stdout, "DID we get the newer version???\n");
     //fprintf(stdout, "identifier file name is %s\n", identifierFileName);
 
     //strncpy(identifier_filename, identifierFileName, 1024);
     //strcpy(identifier_filename, identifierFileName);
 
-    fprintf(stdout, "DID we get the newer version???\n");
+    //fprintf(stdout, "DID we get the newer version???\n");
     //fprintf(stdout, "identifier file name is %s\n", identifier_filename);
     
     if (numTotalMessages == 0)
