@@ -593,12 +593,12 @@ struct RdmaTransport {
 			    workCompletion.vendor_err);
 		    throw std::runtime_error("ERR:\tReceiver work completion error");
 		  }
-		else
-		  {
-		    uint32_t transferredRegionIndex = (uint32_t)(workCompletion.wr_id / manager->numContiguousMessages);
-		    uint32_t transferredContiguousIndex = (uint32_t)(workCompletion.wr_id % manager->numContiguousMessages);
-		    setMessageTransferred(manager, transferredRegionIndex, transferredContiguousIndex, numWorkRequestCompletions+numWorkRequestsMissing);
-		  }
+		//else
+		//  {
+		//    uint32_t transferredRegionIndex = (uint32_t)(workCompletion.wr_id / manager->numContiguousMessages);
+		//    uint32_t transferredContiguousIndex = (uint32_t)(workCompletion.wr_id % manager->numContiguousMessages);
+		//    setMessageTransferred(manager, transferredRegionIndex, transferredContiguousIndex, numWorkRequestCompletions+numWorkRequestsMissing);
+		//  }
 		if (hasImmediateData)
 		  {
 		    /* check immediate data value is incrementing contiguously */
@@ -651,14 +651,14 @@ struct RdmaTransport {
 			    workCompletion.status, workCompletion.wr_id, workCompletion.imm_data, workCompletion.vendor_err);
 		    throw std::runtime_error("ERR:\tSender work completion error");
 		  }
-		else
-		  {
-		    /* note imm_data seems to not appear in sender's workCompletion */
-		    uint32_t transferredRegionIndex = (uint32_t)(workCompletion.wr_id / manager->numContiguousMessages);
-		    uint32_t transferredContiguousIndex = (uint32_t)(workCompletion.wr_id % manager->numContiguousMessages);
-		    /* set memory region to be unpopulated so can be repopulated with further data */
-		    setMessageTransferred(manager, transferredRegionIndex, transferredContiguousIndex, numWorkRequestCompletions);
-		  }
+		//else
+		//  {
+		//    /* note imm_data seems to not appear in sender's workCompletion */
+		//    uint32_t transferredRegionIndex = (uint32_t)(workCompletion.wr_id / manager->numContiguousMessages);
+		//    uint32_t transferredContiguousIndex = (uint32_t)(workCompletion.wr_id % manager->numContiguousMessages);
+		//    /* set memory region to be unpopulated so can be repopulated with further data */
+		//    setMessageTransferred(manager, transferredRegionIndex, transferredContiguousIndex, numWorkRequestCompletions);
+		//  }
 		currentQueueLoading--;
 		numWorkRequestCompletions++;
 		metricMessagesTransferred++;
