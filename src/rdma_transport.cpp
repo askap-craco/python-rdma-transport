@@ -553,12 +553,6 @@ struct RdmaTransport {
 			    workCompletion.vendor_err);
 		    throw std::runtime_error("ERR:\tReceiver work completion error");
 		  }
-		//else
-		//  {
-		//    uint32_t transferredRegionIndex = (uint32_t)(workCompletion.wr_id / manager->numContiguousMessages);
-		//    uint32_t transferredContiguousIndex = (uint32_t)(workCompletion.wr_id % manager->numContiguousMessages);
-		//    setMessageTransferred(manager, transferredRegionIndex, transferredContiguousIndex, numWorkRequestCompletions+numWorkRequestsMissing);
-		//  }
 		if (hasImmediateData)
 		  {
 		    /* check immediate data value is incrementing contiguously */
@@ -609,14 +603,6 @@ struct RdmaTransport {
 			    workCompletion.status, workCompletion.wr_id, workCompletion.imm_data, workCompletion.vendor_err);
 		    throw std::runtime_error("ERR:\tSender work completion error");
 		  }
-		//else
-		//  {
-		//    /* note imm_data seems to not appear in sender's workCompletion */
-		//    uint32_t transferredRegionIndex = (uint32_t)(workCompletion.wr_id / manager->numContiguousMessages);
-		//    uint32_t transferredContiguousIndex = (uint32_t)(workCompletion.wr_id % manager->numContiguousMessages);
-		//    /* set memory region to be unpopulated so can be repopulated with further data */
-		//    setMessageTransferred(manager, transferredRegionIndex, transferredContiguousIndex, numWorkRequestCompletions);
-		//  }
 		currentQueueLoading--;
 		numWorkRequestCompletions++;
 	      }
@@ -629,6 +615,11 @@ struct RdmaTransport {
   int get_numCompletionsFound()
   {
     return numCompletionsFound;
+  }
+
+  uint64_t get_numWorkRequestCompletions()
+  {
+    return numWorkRequestCompletions;
   }
 
   uint32_t get_numMissingFound()
@@ -758,14 +749,15 @@ PYBIND11_MODULE(rdma_transport, m) {
     .def("setQueuePairNumber",      &RdmaTransport::setQueuePairNumber)
     .def("setGidAddress",           &RdmaTransport::setGidAddress)
     .def("setLocalIdentifier",      &RdmaTransport::setLocalIdentifier)
-    
-    .def("get_numCompletionsFound", &RdmaTransport::get_numCompletionsFound)
-    .def("get_numMissingFound",     &RdmaTransport::get_numMissingFound)
-    .def("get_workCompletions",     &RdmaTransport::get_workCompletions)    
-    .def("pollRequests",            &RdmaTransport::pollRequests)
-    .def("waitRequestsCompletion",  &RdmaTransport::waitRequestsCompletion)
-    .def("issueRequests",           &RdmaTransport::issueRequests)
-    .def("setupRdma",               &RdmaTransport::setupRdma)
+
+    .def("get_numWorkRequestCompletions", &RdmaTransport::get_numWorkRequestCompletions)
+    .def("get_numCompletionsFound",       &RdmaTransport::get_numCompletionsFound)
+    .def("get_numMissingFound",           &RdmaTransport::get_numMissingFound)
+    .def("get_workCompletions",           &RdmaTransport::get_workCompletions)    
+    .def("pollRequests",                  &RdmaTransport::pollRequests)
+    .def("waitRequestsCompletion",        &RdmaTransport::waitRequestsCompletion)
+    .def("issueRequests",                 &RdmaTransport::issueRequests)
+    .def("setupRdma",                     &RdmaTransport::setupRdma)
     
     .def("say_hello",               &RdmaTransport::say_hello)
     .def("addition",                &RdmaTransport::addition)

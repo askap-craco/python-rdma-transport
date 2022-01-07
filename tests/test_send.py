@@ -11,8 +11,8 @@ def test_send_messages():
     messageSize = 65536
     numMemoryBlocks = 10
     numContiguousMessages = 100
-    numTotalMessages = 10*numMemoryBlocks*numContiguousMessages-1
-    messageDelayTime = 300
+    numTotalMessages = 100*numMemoryBlocks*numContiguousMessages-1
+    messageDelayTime = 0
     rdmaDeviceName = None #"mlx5_1"
     rdmaPort = 1
     gidIndex = -1
@@ -46,6 +46,7 @@ def test_send_messages():
     rdma_transport.setupRdma(identifierFileName)
 
     numCompletionsTotal = 0
+    start = time.time()
     while numCompletionsTotal < numTotalMessages:
         rdma_transport.issueRequests()
         print("issue requests done")
@@ -62,8 +63,8 @@ def test_send_messages():
         # Record how many completions got so far
         numCompletionsTotal += numCompletionsFound
         
-        workCompletions = rdma_transport.get_workCompletions
-        print("got workCompletions")
+        #workCompletions = rdma_transport.get_workCompletions
+        #print("got workCompletions")
         
         #ndata_print = 10
         #rdma_memory = rdma_transport.get_memoryview(0)
@@ -72,6 +73,12 @@ def test_send_messages():
         #print(f"Number of numCompletionsFound {numCompletionsFound}, and workCompletions {workCompletions} with first {ndata_print} data\n {rdma_buffer[0:ndata_print]}")
 
         #time.sleep(0.1)
-        
+
+    end = time.time()
+    interval = end - start
+    rate = 8E-9*numTotalMessages*messageSize/interval
+    
+    print(f'sender data rate is {rate} Gbps')
+    
 if __name__ == '__main__':
     test_send_messages()

@@ -11,7 +11,7 @@ def test_receive_messages():
     messageSize = 65536
     numMemoryBlocks = 10
     numContiguousMessages = 100
-    numTotalMessages = 10*numMemoryBlocks*numContiguousMessages-1
+    numTotalMessages = 100*numMemoryBlocks*numContiguousMessages-1
     messageDelayTime = 0
     rdmaDeviceName = None #"mlx5_1"
     rdmaPort = 1
@@ -48,9 +48,12 @@ def test_receive_messages():
     numCompletionsTotal = 0
     numMissingTotal = 0
     numMessagesTotal = 0
-    while numMessagesTotal < numTotalMessages:
+    numRequestTotal = 0
+    #while numMessagesTotal < numTotalMessages:
+    start = time.time()
+    while numCompletionsTotal < numTotalMessages:
 
-        print(f'{numCompletionsTotal} + {numMissingTotal} VS {numMessagesTotal} VS {numTotalMessages}')
+        print(f'{numRequestTotal} vs {numCompletionsTotal} + {numMissingTotal} VS {numMessagesTotal} VS {numTotalMessages}')
     #for i in range(2):
         rdma_transport.issueRequests()
         print("issue requests done")
@@ -66,20 +69,28 @@ def test_receive_messages():
 
         numMissingFound = rdma_transport.get_numMissingFound()
         print("got numMissingFound")
-        
+
+        numRequestTotal = rdma_transport.get_numWorkRequestCompletions()
+        print("got numRequestTotal")
+
         numCompletionsTotal += numCompletionsFound
         numMissingTotal += numMissingFound
 
         numMessagesTotal += (numCompletionsFound+numMissingFound)
         
-        workCompletions = rdma_transport.get_workCompletions()
-        print("got workCompletions")
+        #workCompletions = rdma_transport.get_workCompletions()
+        #print("got workCompletions")
         
         #ndata_print = 10
         #rdma_memory = rdma_transport.get_memoryview(0)
         #rdma_buffer = np.frombuffer(rdma_memory, dtype=np.int16)
         
         #print(f"Number of numCompletionsFound {numCompletionsFound}, and workCompletions {workCompletions} with first {ndata_print} data\n {rdma_buffer[0:ndata_print]}")
+    end = time.time()
+    interval = end - start
+    rate = 8E-9*numTotalMessages*messageSize/interval
+
+    #print(f'receiver data rate is {rate} Gbps')
     
 if __name__ == '__main__':
     test_receive_messages()
