@@ -407,7 +407,7 @@ struct RdmaTransport {
     /* setup for loop enqueueing blocks of work requests and polling for blocks of work completions */
     minWorkRequestEnqueue = (uint32_t) ceil(queueCapacity * MIN_WORK_REQUEST_ENQUEUE);
     maxWorkRequestDequeue = queueCapacity; /* try to completely drain queue of any completed work requests */
-    workCompletions.resize(maxWorkRequestDequeue);
+    //workCompletions.resize(maxWorkRequestDequeue);
     
     currentQueueLoading = 0; /* no work requests initially in queue */
     numWorkRequestsEnqueued = 0;
@@ -527,6 +527,7 @@ struct RdmaTransport {
   {    
     numCompletionsFound = 0;
     numMissingFound = 0;
+    workCompletions.resize(maxWorkRequestDequeue);
     
     if (mode == RECV_MODE)
       {
@@ -608,7 +609,8 @@ struct RdmaTransport {
 	      }
 	  }	
       }
-    
+
+    workCompletions.resize(numCompletionsFound);
   }
   
   // Easy way to get class member
