@@ -54,7 +54,10 @@ def test_receive_messages():
     while numCompletionsTotal < numTotalMessages:
 
         print(f'{numRequestTotal} vs {numCompletionsTotal} + {numMissingTotal} VS {numMessagesTotal} VS {numTotalMessages}')
-    #for i in range(2):
+        #for i in range(2):
+
+        loopStart = time.time()
+
         rdma_transport.issueRequests()
         print("issue requests done")
         
@@ -77,6 +80,13 @@ def test_receive_messages():
         numMissingTotal += numMissingFound
 
         numMessagesTotal += (numCompletionsFound+numMissingFound)
+        
+        workCompletionsStart = time.time()
+        workCompletions = rdma_transport.get_workCompletions()
+        workCompletionsEnd = time.time()
+        
+        print(f"got_workCompletions takes {workCompletionsEnd - workCompletionsStart} seconds")
+        print(f"the rest takes {workCompletionsStart - loopStart} seconds")
         
         #workCompletions = rdma_transport.get_workCompletions()
         #print("got workCompletions")
