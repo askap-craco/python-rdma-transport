@@ -729,7 +729,33 @@ PYBIND11_MODULE(rdma_transport, m) {
     .def_readonly("slid",           &ibv_wc::slid)
     .def_readonly("sl",             &ibv_wc::sl)
     .def_readonly("dlid_path_bits", &ibv_wc::dlid_path_bits);
-    
+
+  py::enum_<ibv_wc_status>(m, "ibv_wc_status")  
+    .value("IBV_WC_SUCCESS"          , ibv_wc_status{IBV_WC_SUCCESS})
+    .value("IBV_WC_LOC_LEN_ERR"      , ibv_wc_status{IBV_WC_LOC_LEN_ERR})
+    .value("IBV_WC_LOC_QP_OP_ERR"    , ibv_wc_status{IBV_WC_LOC_QP_OP_ERR})
+    .value("IBV_WC_LOC_EEC_OP_ERR"   , ibv_wc_status{IBV_WC_LOC_EEC_OP_ERR})
+    .value("IBV_WC_LOC_PROT_ERR"     , ibv_wc_status{IBV_WC_LOC_PROT_ERR})
+    .value("IBV_WC_WR_FLUSH_ERR"     , ibv_wc_status{IBV_WC_WR_FLUSH_ERR})
+    .value("IBV_WC_MW_BIND_ERR"	     , ibv_wc_status{IBV_WC_MW_BIND_ERR})
+    .value("IBV_WC_BAD_RESP_ERR"     , ibv_wc_status{IBV_WC_BAD_RESP_ERR})
+    .value("IBV_WC_LOC_ACCESS_ERR"   , ibv_wc_status{IBV_WC_LOC_ACCESS_ERR})
+    .value("IBV_WC_REM_INV_REQ_ERR"  , ibv_wc_status{IBV_WC_REM_INV_REQ_ERR})
+    .value("IBV_WC_REM_ACCESS_ERR"   , ibv_wc_status{IBV_WC_REM_ACCESS_ERR})
+    .value("IBV_WC_REM_OP_ERR"	     , ibv_wc_status{IBV_WC_REM_OP_ERR})
+    .value("IBV_WC_RETRY_EXC_ERR"    , ibv_wc_status{IBV_WC_RETRY_EXC_ERR})
+    .value("IBV_WC_RNR_RETRY_EXC_ERR", ibv_wc_status{IBV_WC_RNR_RETRY_EXC_ERR})
+    .value("IBV_WC_LOC_RDD_VIOL_ERR" , ibv_wc_status{IBV_WC_LOC_RDD_VIOL_ERR})
+    .value("IBV_WC_REM_INV_RD_REQ_ERR", ibv_wc_status{IBV_WC_REM_INV_RD_REQ_ERR})
+    .value("IBV_WC_REM_ABORT_ERR"     , ibv_wc_status{IBV_WC_REM_ABORT_ERR})
+    .value("IBV_WC_INV_EECN_ERR"      , ibv_wc_status{IBV_WC_INV_EECN_ERR})
+    .value("IBV_WC_INV_EEC_STATE_ERR" , ibv_wc_status{IBV_WC_INV_EEC_STATE_ERR})
+    .value("IBV_WC_FATAL_ERR"	      , ibv_wc_status{IBV_WC_FATAL_ERR})
+    .value("IBV_WC_RESP_TIMEOUT_ERR"  , ibv_wc_status{IBV_WC_RESP_TIMEOUT_ERR})
+    .value("IBV_WC_GENERAL_ERR"	      , ibv_wc_status{IBV_WC_GENERAL_ERR})
+    .value("IBV_WC_TM_ERR"	      , ibv_wc_status{IBV_WC_TM_ERR})
+    .value("IBV_WC_TM_RNDV_INCOMPLETE", ibv_wc_status{IBV_WC_TM_RNDV_INCOMPLETE})
+    .export_values();
   
   py::class_<RdmaTransport>(m, "RdmaTransport")
     .def(py::init<enum runMode,
