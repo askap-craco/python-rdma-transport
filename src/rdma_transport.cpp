@@ -793,6 +793,19 @@ PYBIND11_MODULE(rdma_transport, m) {
 
   m.def("run_test", &run_test);
 
+  py::enum_<logType>(m, "logType")  
+    .value("LOG_EMERG", logType{LOG_EMERG})
+    .value("LOG_ALERT", logType{LOG_ALERT})
+    .value("LOG_CRIT", logType{LOG_CRIT})
+    .value("LOG_ERR", logType{LOG_ERR})
+    .value("LOG_WARNING", logType{LOG_WARNING})
+    .value("LOG_NOTICE", logType{LOG_NOTICE})
+    .value("LOG_INFO", logType{LOG_INFO})
+    .value("LOG_DEBUG", logType{LOG_DEBUG})
+    .export_values();
+  m.def("setLogLevel", &setLogLevel);
+
+
   // To create a buffer
   // https://pybind11.readthedocs.io/en/stable/advanced/pycpp/numpy.html
   // expections
