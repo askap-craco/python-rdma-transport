@@ -26,6 +26,7 @@ struct RdmaTransport {
   char* rdmaDeviceName = nullptr; /* no preferred rdma device name to choose */
   uint8_t rdmaPort = 1;
   int gidIndex = -1; /* preferred gid index or -1 for no preference */
+  bool checkImmediate = false;
 
   /* setup when class instance is created */
   struct ibv_context *rdmaDeviceContext;
@@ -429,6 +430,11 @@ struct RdmaTransport {
     if ( mode == RECV_MODE)
       {	
         /* post block of receive work requests to sufficiently full work request queue */
+        /* KB - it isn't clear what this check for missing work requests is trying to do
+           When we have many missing work requets, we evneutally stup submitting more
+           work requets (which happens when the immediate data isn't incrementing by 1,
+           because it carries frameID
+        */
         while ((numWorkRequestsEnqueued + numWorkRequestsMissing < manager->numTotalMessages)
 	       && (currentQueueLoading < minWorkRequestEnqueue))
 	  {
@@ -554,7 +560,7 @@ struct RdmaTransport {
 			    workCompletion.vendor_err);
 		    throw std::runtime_error("ERR:\tReceiver work completion error");
 		  }
-		if (hasImmediateData)
+		if (hasImmediateData && checkImmediate)
 		  {
 		    /* check immediate data value is incrementing contiguously */
 		    if (immediateData == previousImmediateData)
@@ -789,7 +795,35 @@ PYBIND11_MODULE(rdma_transport, m) {
     
     .def("say_hello",               &RdmaTransport::say_hello)
     .def("addition",                &RdmaTransport::addition)
-    .def("get_memoryview",          &RdmaTransport::get_memoryview);
+    .def("get_memoryview",          &RdmaTransport::get_memoryview)
+    .def_readonly("messageSize", &RdmaTransport::messageSize)
+    .def_readonly("numMemoryBlocks", &RdmaTransport::numMemoryBlocks)
+    .def_readonly("numContiguousMessages", &RdmaTransport::numContiguousMessages)
+    .def_readonly("numTotalMessages", &RdmaTransport::numTotalMessages)
+    .def_readonly("messageDelayTime", &RdmaTransport::messageDelayTime)
+    .def_readonly("rdmaDeviceName", &RdmaTransport::rdmaDeviceName)
+    .def_readonly("rdmaPort", &RdmaTransport::rdmaPort)
+    .def_readonly("gidIndex", &RdmaTransport::gidIndex)
+    .def_readwrite("checkImmediate", &RdmaTransport::checkImmediate)
+    .def_readonly("queueCapacity", &RdmaTransport::queueCapacity)
+    .def_readonly("maxInlineDataSize", &RdmaTransport::maxInlineDataSize)
+    .def_readonly("minWorkRequestEnqueue", &RdmaTransport::minWorkRequestEnqueue)
+    .def_readonly("maxWorkRequestDequeue", &RdmaTransport::maxWorkRequestDequeue)
+    .def_readonly("currentQueueLoading", &RdmaTransport::currentQueueLoading)
+    .def_readonly("numWorkRequestsEnqueued", &RdmaTransport::numWorkRequestsEnqueued)
+    .def_readonly("previousImmediateData", &RdmaTransport::previousImmediateData)
+    .def_readonly("numWorkRequestsMissing", &RdmaTransport::numWorkRequestsMissing)
+    .def_readonly("regionIndex", &RdmaTransport::regionIndex)
+    .def_readonly("numWorkRequestCompletions", &RdmaTransport::numWorkRequestCompletions)
+    .def_readonly("numCompletionsFound", &RdmaTransport::numCompletionsFound)
+    .def_readonly("numMissingFound", &RdmaTransport::numMissingFound)
+    .def_readonly("packetSequenceNumber", &RdmaTransport::packetSequenceNumber)
+    .def_readonly("queuePairNumber", &RdmaTransport::queuePairNumber)
+    .def_readonly("localIdentifier", &RdmaTransport::localIdentifier)
+    .def_readonly("remotePSN", &RdmaTransport::remotePSN)
+    .def_readonly("remoteQPN", &RdmaTransport::remoteQPN)
+    .def_readonly("remoteGID", &RdmaTransport::remoteGID)
+    .def_readonly("remoteLID", &RdmaTransport::remoteLID);
 
   m.def("run_test", &run_test);
 
