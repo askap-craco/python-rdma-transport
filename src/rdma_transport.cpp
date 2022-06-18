@@ -817,7 +817,7 @@ PYBIND11_MODULE(rdma_transport, m) {
     .def_readonly("numWorkRequestCompletions", &RdmaTransport::numWorkRequestCompletions)
     .def_readonly("numCompletionsFound", &RdmaTransport::numCompletionsFound)
     .def_readonly("numMissingFound", &RdmaTransport::numMissingFound)
-    .def_readonly("packetSequenceNumber", &RdmaTransport::packetSequenceNumber)
+    .def_readwrite("packetSequenceNumber", &RdmaTransport::packetSequenceNumber)
     .def_readonly("queuePairNumber", &RdmaTransport::queuePairNumber)
     .def_readonly("localIdentifier", &RdmaTransport::localIdentifier)
     .def_readonly("remotePSN", &RdmaTransport::remotePSN)
