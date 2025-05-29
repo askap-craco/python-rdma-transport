@@ -28,21 +28,28 @@ def transport():
     metricURL = None
     numMetricAveraging = 0
   
-    t = RdmaTransport(requestLogLevel, 
-                                   mode, 
+    mode = runMode.RECV_MODE
+    messageSize = 65536
+    numMemoryBlocks = 10
+    numContiguousMessages = 100
+    numTotalMessages = 100*numMemoryBlocks*numContiguousMessages-1
+    messageDelayTime = 0
+    rdmaDeviceName = None #"mlx5_1"
+    rdmaPort = 1
+    gidIndex = -1
+    identifierFileName = "exchange"
+  
+    rdma_transport = RdmaTransport(mode, 
                                    messageSize,
                                    numMemoryBlocks,
                                    numContiguousMessages,
-                                   dataFileName,
                                    numTotalMessages,
                                    messageDelayTime,
                                    rdmaDeviceName,
                                    rdmaPort,
-                                   gidIndex,
-                                   identifierFileName,
-                                   metricURL,
-                                   numMetricAveraging)
-    return t
+                                   gidIndex)
+
+    return rdma_transport
 
 
 def test_memorybuffer_works(transport):
@@ -52,6 +59,11 @@ def test_memorybuffer_works(transport):
     print('Made array', arr.shape, arr.dtype, arr.itemsize, arr.size)
     arr[:] = np.arange(len(arr))
     print(arr.sum())
+
+def test_wait_with_timeout_throws_exception(transport):
+    with pytest.raises(rdma_transport.TimeoutError):
+        transport.timeoutMillis = 10
+        transport.waitRequestsCompletion()
 
 def test_memorybuffer_throws_exception(transport):
     with pytest.raises(RuntimeError):

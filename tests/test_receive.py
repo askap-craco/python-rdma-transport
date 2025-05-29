@@ -51,6 +51,9 @@ def test_receive_messages():
     numRequestTotal = 0
     #while numMessagesTotal < numTotalMessages:
     start = time.time()
+    timeout = 20
+    print('Setting timeout to {timeout} seconds')
+    rdma_transport.timeoutMillis = timeout*1000
     while numCompletionsTotal < numTotalMessages:
 
         print(f'{numRequestTotal} vs {numCompletionsTotal} + {numMissingTotal} VS {numMessagesTotal} VS {numTotalMessages}')

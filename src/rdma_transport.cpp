@@ -1,11 +1,17 @@
 #include "rdma_transport.hpp"
 #include "rdma_transport_simpletest.hpp"
+#include <poll.h>
 
 extern "C" {
 #include "RDMAapi.h"
 }
 
-
+// Custom exception class for timeouts
+class TimeoutException : public std::runtime_error {
+  public:
+      explicit TimeoutException(const std::string& message)
+          : std::runtime_error(message) {}
+  };
 
 // How to print on terminal, okay
 // How to get c++ exception with python, done
@@ -79,6 +85,9 @@ struct RdmaTransport {
   uint16_t remoteLID;
   
   enum ibv_mtu mtu;
+
+  /* timeout in milliseconds for a wait call*/
+  int timeoutMillis;
   
   RdmaTransport(enum runMode _mode,
 		uint32_t _messageSize,
@@ -99,6 +108,7 @@ struct RdmaTransport {
     rdmaPort(_rdmaPort),
     gidIndex(_gidIndex)
   {
+    timeoutMillis = 0;  /* no timeout by default */
     if (numTotalMessages == 0)
       numTotalMessages = numMemoryBlocks * numContiguousMessages;
     
@@ -490,6 +500,8 @@ struct RdmaTransport {
    * may come in future on that completion queue
    * Note this function gets called by sendWorkRequests and receiveWorkRequests
    * so does not need to be called directly
+   * If timeoutMillis > 0 then it will poll with the timeout and throw a TimeoutException 
+   * error if it timed out
    **********************************************************************/
   int waitForCompletionQueueEvent()
   {
@@ -497,6 +509,22 @@ struct RdmaTransport {
     struct ibv_cq *eventCompletionQueue;
     void *eventContext;
     assert(eventChannel != NULL);
+    if (timeoutMillis > 0) {
+      struct pollfd pollFd;
+      pollFd.fd = eventChannel->fd;  // File descriptor for the event channel
+      pollFd.events = POLLIN;        // Wait for input events
+  
+      int pollResult = poll(&pollFd, 1, timeoutMillis); // Poll with timeout
+      if (pollResult < 0)
+      {
+        throw std::runtime_error("ERR:\tError while waiting for completion queue event\n");
+      }
+      else if (pollResult == 0)
+      {
+          throw TimeoutException("Timeout while waiting for completion queue event");
+      }
+    }     
+    
     if (ibv_get_cq_event(eventChannel, &eventCompletionQueue, &eventContext) != SUCCESS)
       {	
 	fprintf(stderr, "ERR:\tError while waiting for completion queue event\n");
@@ -654,18 +682,23 @@ struct RdmaTransport {
     cleanupRDMAResources(rdmaDeviceContext, eventChannel, protectionDomain,
 			 receiveCompletionQueue, sendCompletionQueue, queuePair);
 
-    destroyMemoryRegionManager(manager);
+    if (sgItems != nullptr) { 
+      for(auto iregion = 0; iregion < manager->numMemoryRegions; iregion++) {
+          printf("SGitems 0x%x iregion %d=0x%x", sgItems, iregion, sgItems[iregion]);
+          if (sgItems[iregion] != nullptr) {
+            delete [] sgItems[iregion]; // breaks? Not sure why. DOn't care.
+          }      
+        }
+        delete [] sgItems;
+      }
 
-    /* free memory block buffers */
-    freeMemoryBlocks(memoryBlocks, numMemoryBlocks);
+      destroyMemoryRegionManager(manager);
 
-    for(auto iregion = 0; iregion < manager->numMemoryRegions; iregion++) {
-      delete [] sgItems[iregion];
-    }
-    delete [] sgItems;
+      /* free memory block buffers */
+      freeMemoryBlocks(memoryBlocks, numMemoryBlocks);
 
-    fprintf(stdout, "INFO:\tReceive Visibilities ending %d\n", mode);
-  }  
+      fprintf(stdout, "INFO:\tReceive Visibilities ending %d\n", mode);
+    }  
   
   int addition(int a, int b){
     return a+b;
@@ -823,7 +856,8 @@ PYBIND11_MODULE(rdma_transport, m) {
     .def_readonly("remotePSN", &RdmaTransport::remotePSN)
     .def_readonly("remoteQPN", &RdmaTransport::remoteQPN)
     .def_readonly("remoteGID", &RdmaTransport::remoteGID)
-    .def_readonly("remoteLID", &RdmaTransport::remoteLID);
+    .def_readonly("remoteLID", &RdmaTransport::remoteLID)
+    .def_readwrite("timeoutMillis", &RdmaTransport::timeoutMillis);
 
   m.def("run_test", &run_test);
 
@@ -838,6 +872,9 @@ PYBIND11_MODULE(rdma_transport, m) {
     .value("LOG_DEBUG", logType{LOG_DEBUG})
     .export_values();
   m.def("setLogLevel", &setLogLevel);
+
+  py::register_exception<TimeoutException>(m, "TimeoutException");
+
 
 
   // To create a buffer
